@@ -1,0 +1,34 @@
+# Track an explicit source allowlist. Local TV records stay outside version control.
+/*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/CHANGELOG.md
+!/BACKGROUND-ASSETS.md
+!/AndroidManifest.xml
+!/build.ps1
+!/install-preview.ps1
+!/Restore-System-Home.ps1
+!/src/
+!/res/
+
+# Private signing material and generated output must never be committed.
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.pfx
+**/*.pem
+**/*.key
+**/*.apk
+**/*.idsig
+**/local.properties
+**/.env
+**/.env.*
+**/build/
+**/.gradle/
+
+# Editor and operating-system files.
+**/.idea/
+**/.vscode/
+**/Thumbs.db
+**/.DS_Store
