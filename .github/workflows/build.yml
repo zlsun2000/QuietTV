@@ -38,6 +38,15 @@ jobs:
         run: bash build.sh
       - name: Public source, history and APK review gate
         run: python3 tools/check-release.py --apk QuietTV.apk
+      - name: Pin the emulator runtime for older TV images
+        if: matrix.api != 28
+        run: |
+          runtime_dir="$RUNNER_TEMP/quiettv-emulator-35.2.10"
+          mkdir -p "$runtime_dir"
+          curl --fail --location --retry 2 'https://edgedl.me.gvt1.com/edgedl/android/repository/emulator-linux_x64-12414864.zip' --output "$runtime_dir/runtime.zip"
+          echo '03f3265250613cd697129f7633ca6f4815dd5ce4c94db845284d1a2a95732aad'"  $runtime_dir/runtime.zip" | sha256sum --check
+          unzip -q "$runtime_dir/runtime.zip" -d "$runtime_dir"
+          echo "QUIETTV_EMULATOR_BIN=$runtime_dir/emulator/emulator" >> "$GITHUB_ENV"
       - name: Fresh install, remote navigation, document import and upgrade
         run: bash tests/device/run.sh
       - name: Preserve emulator evidence

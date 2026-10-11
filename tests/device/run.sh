@@ -7,6 +7,7 @@ build_tools="${QUIETTV_BUILD_TOOLS:?}"
 image="${QUIETTV_EMULATOR_IMAGE:?}"
 case "$image" in 'system-images;android-23;android-tv;x86'|'system-images;android-28;android-tv;x86'|'system-images;android-30;android-tv;x86') ;; *) echo 'Unsupported test image' >&2; exit 1 ;; esac
 adb_bin="$sdk_root/platform-tools/adb"
+emulator_bin="${QUIETTV_EMULATOR_BIN:-$sdk_root/emulator/emulator}"
 serial='emulator-5556'
 # Bound every ADB call; a disconnected guest must not stall the whole job.
 adb_device() { timeout 60s "$adb_bin" -s "$serial" "$@"; }
@@ -24,11 +25,8 @@ echo no | "$sdk_root/cmdline-tools/latest/bin/avdmanager" create avd --force --n
 [[ -f "$avd_path/config.ini" ]] || { echo 'AVD creation failed' >&2; exit 1; }
 printf 'avd.ini.encoding=UTF-8\npath=%s\n' "$avd_path" > "$ANDROID_AVD_HOME/$avd_name.ini"
 graphics=(-gpu swiftshader_indirect)
-if [[ "$image" == 'system-images;android-30;android-tv;x86' ]]; then
-  # API 30's guest disconnects during boot with the older graphics path.
-  graphics=(-gpu swiftshader -feature -Vulkan)
-fi
-"$sdk_root/emulator/emulator" -avd "$avd_name" -port 5556 -no-window -no-audio -no-boot-anim -no-snapshot "${graphics[@]}" -no-metrics -show-kernel -wipe-data > "$project_root/build/ci-artifacts/emulator.log" 2>&1 &
+if [[ "$image" != 'system-images;android-28;android-tv;x86' ]]; then graphics+=(-feature -Vulkan); fi
+"$emulator_bin" -avd "$avd_name" -port 5556 -no-window -no-audio -no-boot-anim -no-snapshot "${graphics[@]}" -no-metrics -show-kernel -wipe-data > "$project_root/build/ci-artifacts/emulator.log" 2>&1 &
 emulator_pid=$!
 cleanup() {
   result=$?
