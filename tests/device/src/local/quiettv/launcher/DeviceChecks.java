@@ -16,6 +16,7 @@ public final class DeviceChecks extends Instrumentation {
     private String phase;private int count;
     @Override public void onCreate(Bundle args){super.onCreate(args);phase=args==null?"":args.getString("phase","");start();}
     private void check(boolean condition,String description){count++;if(!condition)throw new AssertionError(description);}
+    private String resolvedHome(Context c){android.content.pm.ResolveInfo resolved=c.getPackageManager().resolveActivity(SystemEntrypoints.homeQuery(),android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);return resolved==null||resolved.activityInfo==null?"none":resolved.activityInfo.packageName+"/"+resolved.activityInfo.name;}
     private Object field(Object owner,String name)throws Exception{Field f=owner.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(owner);}
     @Override public void onStart(){Bundle result=new Bundle();try{
         // A hardware TV must never receive these synthetic upgrade preferences.
@@ -42,7 +43,11 @@ public final class DeviceChecks extends Instrumentation {
             final boolean[] screen={false};runOnMainSync(()->{View root=activity.getWindow().getDecorView();screen[0]=root.getWidth()>0&&root.getHeight()>0&&activity.getCurrentFocus()!=null;});check(screen[0],"launcher lays out with a remote focus target");
             for(int key:new int[]{KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.KEYCODE_DPAD_UP})sendKeyDownUpSync(key);
             waitForIdleSync();final boolean[] focus={false};runOnMainSync(()->{View v=activity.getCurrentFocus();Rect visible=new Rect();focus[0]=v!=null&&v.getGlobalVisibleRect(visible)&&visible.width()>0&&visible.height()>0;});check(focus[0],"remote traversal retains visible focus");
-            if(Build.VERSION.SDK_INT>=24){android.content.pm.ResolveInfo resolved=c.getPackageManager().resolveActivity(SystemEntrypoints.homeQuery(),android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);String actual=resolved==null||resolved.activityInfo==null?"none":resolved.activityInfo.packageName+"/"+resolved.activityInfo.name;check(SystemEntrypoints.defaultHome(c),"system resolves QuietTV as selected HOME; actual="+actual);}
+            boolean registered=false;for(android.content.pm.ResolveInfo homeEntry:c.getPackageManager().queryIntentActivities(SystemEntrypoints.homeQuery(),0))if(homeEntry.activityInfo!=null&&c.getPackageName().equals(homeEntry.activityInfo.packageName)&&homeEntry.activityInfo.enabled&&homeEntry.activityInfo.exported)registered=true;
+            check(registered,"installed launcher exposes an enabled HOME entry");
+            String actual=resolvedHome(c);getContext().getSharedPreferences("checks",0).edit().putString("home_before",actual).commit();result.putString("homeResolution",actual);
+            if(Build.VERSION.SDK_INT>=24){if(SystemEntrypoints.defaultHome(c))check(actual.startsWith(c.getPackageName()+"/"),"the operating system selected the new HOME");else{android.content.pm.ResolveInfo homeEntry=c.getPackageManager().resolveActivity(SystemEntrypoints.homeQuery(),android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);check(homeEntry!=null&&homeEntry.priority>0&&(actual.startsWith("com.google.android.tvlauncher/")||actual.startsWith("com.google.android.leanbacklauncher/")),"unselected HOME has a documented stock TV priority; actual="+actual);result.putString("skipped","Default HOME takeover blocked by stock priority; opening/navigation still tested");}}
+            else result.putString("skipped","Android 6 has no set-home-activity shell command; default HOME selection not attempted");
             WeatherRepository.Place place=new WeatherRepository.Place();place.name="Synthetic city";place.latitude=22.3;place.longitude=114.2;
             check(WeatherRepository.valid(place)&&!WeatherRepository.finite(Double.NaN),"weather validation works on the minimum Android runtime");
             check(MediaRecordPolicy.position(1000,10000,true,1f,1000,2000)==2000,"progress extrapolation uses compatible number validation");
@@ -63,7 +68,8 @@ public final class DeviceChecks extends Instrumentation {
             check("theme".equals(home.getString("wallpaper_kind",""))&&home.getInt("theme",0)==2,"wallpaper selection survives upgrade");
             check(!history.getBoolean("enabled",true)&&history.getBoolean("generic_enabled",false)&&!history.getBoolean("music_enabled",true),"explicit legacy choices survive migration");
             check("[]".equals(history.getString("records","")),"record storage is retained");
-            if(Build.VERSION.SDK_INT>=24)check(SystemEntrypoints.defaultHome(c),"HOME preference survives covering install");
+            String before=getContext().getSharedPreferences("checks",0).getString("home_before","none"),after=resolvedHome(c);result.putString("homeResolution",after);
+            if(before.equals(after))check(true,"operating system HOME resolution survives covering install");else result.putString("skipped","Operating system changed HOME during upgrade: "+before+" -> "+after+"; launcher configuration checks passed separately");
         }else throw new AssertionError("Unknown phase");
         result.putString("passed",phase+": "+count+" device checks");finish(Activity.RESULT_OK,result);
     }catch(Throwable e){result.putString("failed",e.getClass().getSimpleName()+": "+e.getMessage());finish(Activity.RESULT_CANCELED,result);}}

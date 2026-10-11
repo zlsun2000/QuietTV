@@ -66,7 +66,7 @@ if args.apk:
                 for marker in excluded:
                     if marker in data:errors.append(('APK/'+name,'excluded release interface'))
         image=package.read('res/raw/nature_lake.png')
-        notices=package.read('res/raw/legal_notices.txt').decode('utf-8-sig')
+        notices=package.read('res/raw/legal_notices.txt').decode('utf-8-sig').replace('\r\n','\n')
         if (root/'LICENSE').read_text(encoding='utf-8-sig').strip() not in notices:
             errors.append(('APK/legal_notices','MIT copyright/license missing'))
         if hashlib.sha256(image).hexdigest()!='a180d8e7a92a85a109ebff8262edd3a8697f78de3139f7fd08588927db421acb':
