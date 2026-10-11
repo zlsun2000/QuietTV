@@ -25,6 +25,7 @@ public class MainActivity extends Activity {
     private final ArrayList<Group> groups=new ArrayList<>();
     private final ArrayList<ArrayList<View>> focusRows=new ArrayList<>();
     private final ArrayList<CardRow> cardRows=new ArrayList<>();
+    private final ArrayList<SectionHeading> sectionHeadings=new ArrayList<>();
     private final HashMap<String,App> appMap=new HashMap<>();
     private final Handler handler=new Handler();
     private FrameLayout root;
@@ -38,17 +39,28 @@ public class MainActivity extends Activity {
     private float uiScale=1.5f;
     private int designWidth=1280;
     private InputSources inputSources;
+    private UiConfig ui;
     private Wallpapers wallpapers;
+    private WeatherRepository weather;
+    private WeatherButton weatherButton;
+    private HistoryStore history;
+    private Covers covers;
+    private BiliMetadata biliMetadata;
+    private boolean historyReceiverRegistered;
+    private String historyLayout="";
+    private final HashMap<String,String> recordActions=new HashMap<>();
+    private final BroadcastReceiver historyChanged=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(foreground&&prefs!=null&&!manage){refreshHistoryCards();if(biliMetadata!=null)biliMetadata.refresh();}}};
     private boolean foreground=false,startupShown=false,unlockReceiverRegistered=false;
     private final Runnable waitForUnlock=new Runnable(){public void run(){if(foreground&&prefs==null)resumeHome();}};
     private final Runnable resizeHome=new Runnable(){public void run(){if(!foreground||prefs==null||root==null)return;int w=root.getWidth(),h=root.getHeight();if(w<=0||h<=0)return;float scale=UiMetrics.scale(w,h);int units=UiMetrics.units(w,h);if(Math.abs(uiScale-scale)>.001f||designWidth!=units){uiScale=scale;designWidth=units;render();}}};
     private final BroadcastReceiver userUnlockReceiver=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(Intent.ACTION_USER_UNLOCKED.equals(i.getAction())&&foreground&&prefs==null)resumeHome();}};
     private static class App {String pkg,name;Intent intent;Drawable icon,banner;int color;InputSources.Port port;}
     private static class Group {String id,title;boolean row;Group(String i,String t,boolean r){id=i;title=t;row=r;}}
-    private final Runnable tick=new Runnable(){public void run(){tickClock();refreshInputs();if(wallpapers!=null)wallpapers.status();handler.postDelayed(this,10000);}};
+    private final Runnable tick=new Runnable(){public void run(){tickClock();refreshInputs();if(wallpapers!=null)wallpapers.status();if(biliMetadata!=null)biliMetadata.refresh();handler.postDelayed(this,10000);}};
 
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
+        ui=UiConfig.load(this);
         updateUiMetrics();
         getWindow().getDecorView().setSystemUiVisibility(5894);
         if(Build.VERSION.SDK_INT>=24){registerReceiver(userUnlockReceiver,new IntentFilter(Intent.ACTION_USER_UNLOCKED));unlockReceiverRegistered=true;}
@@ -65,9 +77,13 @@ public class MainActivity extends Activity {
         // Existing credential-protected preferences and media stay in place.
         // Never access them before Android finishes unlocking the user.
         prefs=getSharedPreferences("home",MODE_PRIVATE);
+        if(!prefs.contains("config_schema")){boolean existing=!prefs.getAll().isEmpty();prefs.edit().putInt("config_schema",1).putBoolean("setup_seen",existing).apply();}
         hidden=new HashSet<>(prefs.getStringSet("hidden",Collections.<String>emptySet()));
         favorites=new HashSet<>(prefs.getStringSet("favorites",Collections.<String>emptySet()));
         theme=prefs.getInt("theme",0);inputSources=new InputSources(this);wallpapers=new Wallpapers(this,prefs);loadGroups();
+        history=new HistoryStore(this);covers=new Covers(this);biliMetadata=new BiliMetadata(this);
+        weather=new WeatherRepository(this,new WeatherRepository.Changed(){public void changed(){if(weatherButton!=null)weatherButton.invalidate();}});
+        registerReceiver(historyChanged,new IntentFilter(HistoryStore.CHANGED));historyReceiverRegistered=true;
     }
     private void resumeHome(){
         handler.removeCallbacks(waitForUnlock);
@@ -76,7 +92,8 @@ public class MainActivity extends Activity {
             if(!userStorageReady()){showStartup();handler.postDelayed(waitForUnlock,750);return;}
             initHome();
         }
-        loadApps();render();wallpapers.resume();handler.removeCallbacks(tick);tick.run();
+        loadApps();render();wallpapers.resume();weather.start();handler.removeCallbacks(tick);tick.run();
+        if(!prefs.getBoolean("setup_seen",false))handler.post(()->{if(foreground&&sheet==null){prefs.edit().putBoolean("setup_seen",true).apply();showSetup();}});
     }
     private void showStartup(){
         if(startupShown)return;startupShown=true;
@@ -91,8 +108,8 @@ public class MainActivity extends Activity {
         root.addView(label,new FrameLayout.LayoutParams(-1,-1));setContentView(root);
     }
     @Override public void onResume(){super.onResume();foreground=true;resumeHome();}
-    @Override public void onPause(){foreground=false;handler.removeCallbacks(waitForUnlock);handler.removeCallbacks(resizeHome);handler.removeCallbacks(tick);if(wallpapers!=null)wallpapers.pause();super.onPause();}
-    @Override public void onDestroy(){handler.removeCallbacks(waitForUnlock);handler.removeCallbacks(resizeHome);handler.removeCallbacks(tick);if(unlockReceiverRegistered)unregisterReceiver(userUnlockReceiver);if(wallpapers!=null)wallpapers.dispose();super.onDestroy();}
+    @Override public void onPause(){foreground=false;handler.removeCallbacks(waitForUnlock);handler.removeCallbacks(resizeHome);handler.removeCallbacks(tick);if(weather!=null)weather.stop();if(wallpapers!=null)wallpapers.pause();super.onPause();}
+    @Override public void onDestroy(){handler.removeCallbacks(waitForUnlock);handler.removeCallbacks(resizeHome);handler.removeCallbacks(tick);if(unlockReceiverRegistered)unregisterReceiver(userUnlockReceiver);if(historyReceiverRegistered)unregisterReceiver(historyChanged);if(weather!=null)weather.dispose();if(covers!=null)covers.dispose();if(biliMetadata!=null)biliMetadata.dispose();if(wallpapers!=null)wallpapers.dispose();super.onDestroy();}
     int dp(float n){return Math.round(n*uiScale);}
     TextView text(String value,int size,int color){TextView t=new TextView(this);t.setText(value);t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,dp(size));t.setTextColor(color);t.setFontFeatureSettings("kern");t.setIncludeFontPadding(false);return t;}
     void loadGroups(){
@@ -108,7 +125,7 @@ public class MainActivity extends Activity {
         PackageManager pm=getPackageManager();appMap.clear();apps.clear();
         for(String category:new String[]{Intent.CATEGORY_LEANBACK_LAUNCHER,Intent.CATEGORY_LAUNCHER}){
             for(ResolveInfo ri:pm.queryIntentActivities(new Intent(Intent.ACTION_MAIN).addCategory(category),0)){
-                String pkg=ri.activityInfo.packageName;if(pkg.equals(getPackageName())||pkg.equals("com.tcl.cyberui")||pkg.equals("com.tcl.settings")||appMap.containsKey(pkg))continue;
+                String pkg=ri.activityInfo.packageName;if(pkg.equals(getPackageName())||appMap.containsKey(pkg))continue;
                 try{
                     ApplicationInfo ai=pm.getApplicationInfo(pkg,0);if(!ai.enabled)continue;
                     App a=new App();a.pkg=pkg;a.name=ri.loadLabel(pm).toString();a.icon=ri.loadIcon(pm);a.banner=ri.activityInfo.loadBanner(pm);a.color=iconColor(a.icon);
@@ -117,8 +134,8 @@ public class MainActivity extends Activity {
             }
         }
         for(InputSources.Port port:inputSources.scan()){
-            App a=new App();a.port=port;a.pkg="input:"+port.id;a.name=port.name;a.color=0xff274453;
-            a.intent=new Intent().setComponent(new ComponentName("com.tcl.tv","com.tcl.tv.TVActivity")).putExtra("targetSourceId",port.id).putExtra("referer",getPackageName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            App a=new App();a.port=port;a.pkg=port.key();a.name=port.name;a.color=0xff274453;
+            a.intent=port.intent;
             apps.add(a);appMap.put(a.pkg,a);
         }
         Collections.sort(apps,new Comparator<App>(){public int compare(App a,App b){return a.name.compareToIgnoreCase(b.name);}});
@@ -145,42 +162,106 @@ public class MainActivity extends Activity {
         // Adding fresh focusable views may trigger Android's automatic initial focus.
         // Keep the requested card stable while those focus callbacks rebuild the page.
         final String desiredSelection=selected;
+        refreshRecordActions();
         root=new FrameLayout(this);wallpapers.attach(root,theme);LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);root.addView(page,new FrameLayout.LayoutParams(-1,-1));setContentView(root);
         final FrameLayout measuredRoot=root;
         root.addOnLayoutChangeListener(new View.OnLayoutChangeListener(){public void onLayoutChange(View v,int l,int t,int r,int b,int oldL,int oldT,int oldR,int oldB){if(root==measuredRoot&&foreground&&r>l&&b>t){handler.removeCallbacks(resizeHome);handler.post(resizeHome);}}});
-        focusRows.clear();cardRows.clear();gridColumns=5;
+        focusRows.clear();cardRows.clear();sectionHeadings.clear();gridColumns=ui.columns;
         LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(48),dp(12),dp(48),dp(6));
-        TextView brand=text("静幕",18,WHITE);brand.setLetterSpacing(.12f);brand.setTypeface(Typeface.create("sans-serif-medium",0));header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
-        ArrayList<View> tools=new ArrayList<>();tools.add(tool("输入源","input",0,new Runnable(){public void run(){focusInputs();}}));tools.add(tool("电视设置","settings",1,new Runnable(){public void run(){openSettings();}}));tools.add(tool("桌面设置","home-settings",2,new Runnable(){public void run(){showSettings();}}));for(View t:tools)header.addView(t);focusRows.add(tools);
+        TextView brand=text("静幕",ui.brandSize,WHITE);brand.setLetterSpacing(.12f);brand.setTypeface(Typeface.create("sans-serif-medium",0));header.addView(brand,new LinearLayout.LayoutParams(dp(76),-2));
+        ArrayList<View> tools=new ArrayList<>();weatherButton=null;if(weather.enabled()){weatherButton=new WeatherButton(this,weather,new Runnable(){public void run(){showWeather();}});header.addView(weatherButton,new LinearLayout.LayoutParams(dp(ui.weatherWidth),dp(42)));tools.add(weatherButton);}header.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));if(hasInputs()||SystemEntrypoints.inputSettings(this)!=null)tools.add(tool("输入源","input",0,new Runnable(){public void run(){focusInputs();}}));tools.add(tool("电视设置","settings",1,new Runnable(){public void run(){openSettings();}}));tools.add(tool("桌面设置","home-settings",2,new Runnable(){public void run(){showSettings();}}));for(View t:tools)if(t!=weatherButton)header.addView(t);focusRows.add(tools);
         page.addView(header,new LinearLayout.LayoutParams(-1,dp(54)));
         LinearLayout hero=new LinearLayout(this);hero.setGravity(Gravity.BOTTOM);hero.setPadding(dp(48),0,dp(48),dp(8));
-        LinearLayout timeBlock=new LinearLayout(this);timeBlock.setOrientation(LinearLayout.VERTICAL);clock=text("",54,WHITE);clock.setTypeface(Typeface.create("sans-serif-light",0));timeBlock.addView(clock);
-        TextView date=text(new SimpleDateFormat("M月d日  EEEE",Locale.CHINA).format(new Date()),14,0xffd4dde2);LinearLayout.LayoutParams dateLp=new LinearLayout.LayoutParams(-2,-2);dateLp.topMargin=dp(4);timeBlock.addView(date,dateLp);hero.addView(timeBlock,new LinearLayout.LayoutParams(0,-2,1));
+        LinearLayout timeBlock=new LinearLayout(this);timeBlock.setOrientation(LinearLayout.VERTICAL);clock=text("",ui.clockSize,WHITE);clock.setTypeface(Typeface.create("sans-serif-light",0));timeBlock.addView(clock);
+        TextView date=text(new SimpleDateFormat("M月d日  EEEE",Locale.CHINA).format(new Date()),14,0xffd4dde2);LinearLayout.LayoutParams dateLp=new LinearLayout.LayoutParams(-2,-2);dateLp.topMargin=dp(4);timeBlock.addView(date,dateLp);hero.addView(timeBlock,new LinearLayout.LayoutParams(dp(200),-2));
+        hero.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
         LinearLayout details=new LinearLayout(this);details.setOrientation(LinearLayout.VERTICAL);details.setGravity(Gravity.RIGHT);selectionTitle=text("",26,WHITE);selectionTitle.setSingleLine(true);selectionTitle.setEllipsize(TextUtils.TruncateAt.END);selectionTitle.setGravity(Gravity.RIGHT);selectionTitle.setTypeface(Typeface.create("sans-serif-medium",0));details.addView(selectionTitle);
         selectionSubtitle=text("",12,0xffc6d3da);selectionSubtitle.setSingleLine(true);selectionSubtitle.setEllipsize(TextUtils.TruncateAt.END);LinearLayout.LayoutParams detailLp=new LinearLayout.LayoutParams(-2,-2);detailLp.topMargin=dp(7);details.addView(selectionSubtitle,detailLp);hero.addView(details,new LinearLayout.LayoutParams(dp(490),-2));page.addView(hero,new LinearLayout.LayoutParams(-1,dp(96)));
         scroll=new CardScroll(this);scroll.setFillViewport(true);scroll.setVerticalScrollBarEnabled(false);scroll.setClipChildren(true);scroll.setClipToPadding(true);scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(36),dp(12),dp(36),dp(25));content.setClipChildren(false);content.setClipToPadding(false);scroll.addView(content);page.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        if(manage){addCategory(findGroup("inputs"),"整理输入源",true);addCategory(findGroup("all"),"整理应用",true);}else for(Group g:groups)addCategory(g,g.title,false);
+        if(manage){addCategory(findGroup("inputs"),"整理输入源",true);addCategory(findGroup("all"),"整理应用",true);}else {
+            Group favoriteGroup=findGroup("favorites");boolean primary=!history.visible().isEmpty()&&favoriteGroup!=null&&!groupApps(favoriteGroup,false).isEmpty();
+            if(primary)addPrimary(favoriteGroup);
+            boolean recentAdded=primary;for(Group g:groups){if(primary&&g.id.equals("favorites"))continue;if(!recentAdded&&!g.id.equals("favorites")){addRecent();recentAdded=true;}addCategory(g,g.title,false);}if(!recentAdded)addRecent();
+        }
         hint=text(manage?"确认键隐藏 / 显示应用     返回键完成整理":"方向键选择    确认键打开    长按确认键整理",11,0xffa3b4bf);hint.setPadding(dp(48),dp(4),dp(48),dp(8));page.addView(hint);
-        View target=desiredSelection.isEmpty()?null:content.findViewWithTag(desiredSelection);if(target==null)target=header.findViewWithTag(desiredSelection);if(target==null&&focusRows.size()>1&&!focusRows.get(1).isEmpty())target=focusRows.get(1).get(0);if(target==null)target=tools.get(0);target.requestFocus();tickClock();
+        historyLayout=historyFingerprint();View target=desiredSelection.isEmpty()?null:root.findViewWithTag(desiredSelection);if(target==null)for(ArrayList<View> row:focusRows){if(!row.isEmpty()&&row.get(0).getParent() instanceof CardRow){target=row.get(0);break;}}if(target==null)target=tools.get(0);target.requestFocus();tickClock();
     }
     Group findGroup(String id){for(Group g:groups)if(g.id.equals(id))return g;return null;}
-    void focusInputs(){for(ArrayList<View> row:focusRows)for(View v:row)if(v instanceof Tile&&((Tile)v).group.id.equals("inputs")){v.requestFocus();return;}Toast.makeText(this,"输入源信息暂时不可用",Toast.LENGTH_LONG).show();}
+    // The first band groups applications and one complete content card side by side.
+    // Both panes share vertical visibility and a single left/right focus sequence.
+    void addPrimary(final Group favoriteGroup){
+        ArrayList<App> favoriteApps=groupApps(favoriteGroup,false);ArrayList<PlaybackRecord> records=history.visible();
+        LinearLayout band=new LinearLayout(this);band.setOrientation(LinearLayout.HORIZONTAL);band.setClipChildren(false);band.setClipToPadding(false);
+        int available=designWidth-72,leftWidth=Math.round((available-24)*ui.favoriteRatio),rightWidth=available-24-leftWidth;
+        LinearLayout left=new LinearLayout(this);left.setOrientation(LinearLayout.VERTICAL);left.setClipChildren(false);band.addView(left,new LinearLayout.LayoutParams(dp(leftWidth),-2));
+        LinearLayout right=new LinearLayout(this);right.setOrientation(LinearLayout.VERTICAL);right.setClipChildren(false);LinearLayout.LayoutParams rightLp=new LinearLayout.LayoutParams(dp(rightWidth),-2);rightLp.leftMargin=dp(24);band.addView(right,rightLp);
+        SectionHeading leftHeading=primaryHeading("常用应用",favoriteApps.size()+" 个应用"),rightHeading=primaryHeading("继续播放",records.size()+" 项");left.addView(leftHeading);right.addView(rightHeading);
+        PaneStrip appStrip=new PaneStrip(this);
+        CardRow appRow=new CardRow(this);appRow.visibilityBand=band;appRow.heading=leftHeading;leftHeading.row=appRow;appRow.setPadding(dp(12),dp(6),dp(12),dp(10));appRow.setClipChildren(false);appRow.setClipToPadding(false);cardRows.add(appRow);
+        ArrayList<View> focuses=new ArrayList<>();int appWidth=(leftWidth-24-18)/2;
+        for(int index=0;index<favoriteApps.size();index++){Tile tile=makeTile(favoriteApps.get(index),favoriteGroup);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(appWidth),dp(appWidth*9f/16+27));lp.rightMargin=index<favoriteApps.size()-1?dp(18):0;appRow.addView(tile,lp);focuses.add(tile);}
+        appStrip.addView(appRow);left.addView(appStrip,new LinearLayout.LayoutParams(dp(leftWidth),-2));
+        RecentStrip recentStrip=new RecentStrip(this);CardRow recentRow=new CardRow(this);recentRow.visibilityBand=band;recentRow.heading=rightHeading;rightHeading.row=recentRow;recentRow.setPadding(dp(12),dp(6),dp(12),dp(10));recentRow.setClipChildren(false);recentRow.setClipToPadding(false);cardRows.add(recentRow);int recentWidth=rightWidth-24;
+        for(int index=0;index<records.size();index++){RecentTile tile=recentTile(records.get(index));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(recentWidth),dp(recentWidth*9f/16+50));lp.rightMargin=index<records.size()-1?dp(24):0;recentRow.addView(tile,lp);focuses.add(tile);}
+        recentStrip.addView(recentRow);right.addView(recentStrip,new LinearLayout.LayoutParams(dp(rightWidth),-2));content.addView(band);focusRows.add(focuses);content.addView(new View(this),new LinearLayout.LayoutParams(1,dp(14)));
+    }
+    SectionHeading primaryHeading(String title,String count){SectionHeading heading=new SectionHeading(this);sectionHeadings.add(heading);heading.setGravity(Gravity.CENTER_VERTICAL);heading.setPadding(dp(12),0,dp(12),dp(4));TextView label=text(title,17,WHITE);label.setTypeface(Typeface.create("sans-serif-medium",0));heading.addView(label,new LinearLayout.LayoutParams(0,-2,1));heading.addView(text(count,11,0xff9bafbc));return heading;}
+    RecentTile recentTile(final PlaybackRecord record){RecentTile tile=new RecentTile(this,record,covers);tile.setId(View.generateViewId());tile.setOnClickListener(v->resumeRecord(record));tile.setOnLongClickListener(v->{panel(record.title,record.details()+(record.generic()?"\n应用提供的播放信息；重启后能否续播由原应用决定":""),new String[]{recordAction(record),"从桌面移除",record.apple()?"打开 Apple Music":record.bili()?"B 站全部历史":"打开 "+record.service()},new Choice(){public void pick(int i){if(i==0)resumeRecord(record);else if(i==1){history.remove(record.key());render();}else if(record.bili())openBiliHistory();else openPackage(record.source);}});return true;});return tile;}
+    void refreshRecordActions(){recordActions.clear();java.util.List<android.media.session.MediaController> sessions=GenericMediaHistory.sessions(this);for(PlaybackRecord r:history.visible()){String action=r.actionLabel();if(r.generic())for(android.media.session.MediaController c:sessions)try{if(!r.source.equals(c.getPackageName()))continue;PlaybackRecord live=GenericMediaHistory.record(this,c);android.media.session.PlaybackState state=c.getPlaybackState();if(live!=null&&live.key().equals(r.key())&&state!=null&&(state.getState()==3||(state.getState()==2&&(state.getActions()&(android.media.session.PlaybackState.ACTION_PLAY|android.media.session.PlaybackState.ACTION_PLAY_PAUSE))!=0)))action="恢复当前播放";}catch(Exception ignored){}recordActions.put(r.key(),action);}}
+    String recordAction(PlaybackRecord r){String value=recordActions.get(r.key());return value==null?r.actionLabel():value;}
+    String historyFingerprint(){StringBuilder key=new StringBuilder();for(PlaybackRecord r:history.visible())key.append(r.key()).append('\n').append(r.title).append('\n').append(r.episode).append('\n').append(r.cover).append('\n').append(r.command).append('\n').append(r.routeId).append('\n').append(r.episodeId).append('\n').append(r.routeChannel).append('\n').append(r.sourceLabel).append('\n').append(r.audio).append('\n');return key.toString();}
+    void refreshHistoryCards(){if(!historyLayout.equals(historyFingerprint())){render();return;}refreshRecordActions();HashMap<String,PlaybackRecord> latest=new HashMap<>();for(PlaybackRecord r:history.visible())latest.put(r.key(),r);for(ArrayList<View> row:focusRows)for(View view:row)if(view instanceof RecentTile){PlaybackRecord current=((RecentTile)view).record,fresh=latest.get(current.key());if(fresh!=null){current.position=fresh.position;current.duration=fresh.duration;current.positionKnown=fresh.positionKnown;current.updated=fresh.updated;view.invalidate();}}View focused=getCurrentFocus();if(focused instanceof RecentTile)updateSelection(focused);}
+    void resumeRecord(PlaybackRecord record){if(record.generic()){GenericMediaHistory.open(this,record);return;}if(record.apple()){openPackage(record.source);return;}resumeBili(record);}
+    void addRecent(){
+        ArrayList<PlaybackRecord> records=history.visible();if(records.isEmpty())return;
+        SectionHeading heading=new SectionHeading(this);sectionHeadings.add(heading);heading.setGravity(Gravity.CENTER_VERTICAL);heading.setPadding(dp(12),0,dp(12),dp(4));TextView label=text("继续播放",17,WHITE);label.setTypeface(Typeface.create("sans-serif-medium",0));heading.addView(label,new LinearLayout.LayoutParams(0,-2,1));heading.addView(text(records.size()+" 项",11,0xff9bafbc));content.addView(heading);
+        PaneStrip horizontal=new PaneStrip(this);CardRow row=new CardRow(this);row.heading=heading;heading.row=row;cardRows.add(row);row.setPadding(dp(12),dp(6),dp(12),dp(10));row.setClipChildren(false);row.setClipToPadding(false);ArrayList<View> focuses=new ArrayList<>();int width=(designWidth-96-3*20)/4;
+        for(final PlaybackRecord record:records){RecentTile tile=recentTile(record);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(width),dp(width*9f/16+50));lp.rightMargin=record==records.get(records.size()-1)?0:dp(20);row.addView(tile,lp);focuses.add(tile);}
+        horizontal.addView(row);content.addView(horizontal);focusRows.add(focuses);content.addView(new View(this),new LinearLayout.LayoutParams(1,dp(6)));
+    }
+    void resumeBili(PlaybackRecord record){
+        if(!record.valid()){openPackage(PlaybackRecord.PACKAGE);return;}
+        try{startActivity(BiliResume.intent(record));}catch(Exception e){openBiliHistory();}
+    }
+    void openBiliHistory(){
+        Uri uri=new Uri.Builder().scheme("yst").authority(PlaybackRecord.PACKAGE).appendQueryParameter("type","10").appendQueryParameter("from","quiettv").appendQueryParameter("out","1").build();
+        launch(new Intent(Intent.ACTION_VIEW,uri).setPackage(PlaybackRecord.PACKAGE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),"B 站历史");
+    }
+    void showWeather(){
+        if(!weather.consented()){weatherConsent();return;}
+        WeatherRepository.Data d=weather.data();String title=d==null?"天气":d.place.name+" · "+WeatherRepository.degrees(d.temperature)+" · "+WeatherRepository.condition(d.code);StringBuilder detail=new StringBuilder();
+        if(d==null)detail.append(weather.message());else{for(int i=0;i<d.days.size();i++){WeatherRepository.Day day=d.days.get(i);detail.append(i==0?"今天":i==1?"明天":"后天").append("  ").append(WeatherRepository.condition(day.code)).append("  ").append(WeatherRepository.degrees(day.low)).append(" — ").append(WeatherRepository.degrees(day.high)).append('\n');}detail.append("更新于 ").append(new SimpleDateFormat("M/d HH:mm",Locale.CHINA).format(new Date(d.updated))).append(d.stale()?" · 数据已过期":"");if(!weather.message().isEmpty())detail.append('\n').append(weather.message());}
+        detail.append("\nOpen-Meteo.com · 城市数据 GeoNames\nCC BY 4.0；温度取整、状态翻译，天气为模型估计");
+        panel(title,detail.toString(),new String[]{"刷新天气","更改城市","数据来源与使用条件","关闭桌面天气"},i->{if(i==0){weather.refresh(true);Toast.makeText(this,"正在刷新天气",Toast.LENGTH_SHORT).show();}else if(i==1)searchWeatherCity();else if(i==2)weatherServiceInfo();else{weather.enable(false);render();}});
+    }
+    void weatherConsent(){panel("开启天气","免费服务适用于个人等非商业使用。收费、广告或商业推广版本需另行取得服务方案。\n手动搜索城市：Open-Meteo 接收查询名称；预报接收城市坐标。服务也会看到公网 IP，不发送播放记录或账号信息。\n数据：Open-Meteo / GeoNames，CC BY 4.0。",new String[]{"同意，供个人非商业使用","查看服务条款与数据许可","暂不开启"},i->{if(i==0){weather.consent("manual");weather.enable(true);render();searchWeatherCity();}else if(i==1)weatherServiceInfo();});}
+    void weatherServiceInfo(){panel("天气来源与许可","天气：Open-Meteo.com；城市：GeoNames\n数据许可 CC BY 4.0，静幕将温度取整并翻译状态。\n免费 API 的非商业访问条件与数据许可分别适用。商用分支需使用适用服务方案或关闭天气。",new String[]{"Open-Meteo · 来源与许可","CC BY 4.0 数据许可","GeoNames · 城市来源","Open-Meteo 服务条款","返回"},i->{String[] urls={"https://open-meteo.com/en/licence","https://creativecommons.org/licenses/by/4.0/","https://www.geonames.org/about.html","https://open-meteo.com/en/terms"};if(i<urls.length)launch(new Intent(Intent.ACTION_VIEW,Uri.parse(urls[i])),"天气来源");});}
+    void searchWeatherCity(){
+        final EditText input=new EditText(this);input.setSingleLine(true);input.setTextColor(WHITE);input.setTextSize(18);input.setHint("例如：香港、深圳、北京");input.setHintTextColor(MUTED);input.setPadding(dp(16),dp(15),dp(16),dp(15));input.setInputType(android.text.InputType.TYPE_CLASS_TEXT);input.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        final AlertDialog dialog=new AlertDialog.Builder(this).setTitle("选择天气城市").setView(input).setPositiveButton("搜索",null).setNegativeButton("取消",null).create();dialog.setOnShowListener(v->{final Runnable search=new Runnable(){public void run(){final String query=input.getText().toString().trim();if(query.isEmpty()||query.length()>80)return;dialog.dismiss();Toast.makeText(MainActivity.this,"正在搜索城市…",Toast.LENGTH_SHORT).show();weather.search(query,new WeatherRepository.Cities(){public void found(final ArrayList<WeatherRepository.Place> places){if(!foreground)return;if(places.isEmpty()){Toast.makeText(MainActivity.this,"没有找到城市，请检查网络或换一个名称",Toast.LENGTH_LONG).show();return;}String[] names=new String[places.size()];for(int i=0;i<names.length;i++)names[i]=places.get(i).label();panel("选择城市","城市数据：GeoNames / Open-Meteo · CC BY 4.0",names,new Choice(){public void pick(int i){weather.select(places.get(i));}});}});}};dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v2->search.run());input.setOnEditorActionListener((v2,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH){search.run();return true;}return false;});});dialog.show();input.requestFocus();
+    }
+    void showContentSettings(){panel("天气与继续播放","记录只保存在电视，合计最多 8 项",new String[]{weather.enabled()?"天气 · 已开启":"天气 · 已关闭","天气与城市设置",history.enabled()?"播放记录 · 已开启":"播放记录 · 已关闭",history.genericEnabled()?"其他应用自动识别 · 已开启":"其他应用自动识别 · 已关闭",GenericMediaHistory.permission(this)?"媒体识别权限 · 已授权":"媒体识别权限 · 未授权","按应用管理播放记录","B 站全部历史","清空桌面播放记录"},i->{if(i==0){if(!weather.consented())weatherConsent();else{weather.enable(!weather.enabled());render();}}else if(i==1){if(!weather.consented()){weatherConsent();return;}if(!weather.enabled()){weather.enable(true);render();}showWeather();}else if(i==2){history.enabled(!history.enabled());render();}else if(i==3){history.genericEnabled(!history.genericEnabled());render();}else if(i==4)showMediaPermission();else if(i==5)showMediaApps();else if(i==6)openBiliHistory();else panel("清空桌面记录？","应用里的历史和音乐队列会保留",new String[]{"取消","清空"},n->{if(n==1){history.clear();render();}});});}
+    void showMediaPermission(){panel("媒体识别权限","Android 通过通知访问权限开放媒体会话。\n静幕只读取播放标题、应用提供的副标题、封面与进度，不读取或保存通知正文。\n只打开应用的卡片不保证重启后恢复内容；仍在运行的同一内容可恢复当前播放。",new String[]{"打开系统授权设置","返回"},new Choice(){public void pick(int i){if(i==0)launch(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS),"通知访问设置");}});}
+    void showMediaApps(){final ArrayList<App> eligible=new ArrayList<>();for(App app:apps)if(app.port==null&&GenericMediaHistory.eligible(this,app.pkg))eligible.add(app);if(eligible.isEmpty()){Toast.makeText(this,"尚无可识别的其他应用",Toast.LENGTH_LONG).show();return;}String[] labels=new String[eligible.size()];for(int i=0;i<labels.length;i++){App a=eligible.get(i);labels[i]=a.name+(history.appEnabled(a.pkg)?" · 已开启":" · 已关闭");}panel("按应用管理记录","只有公开播放信息的应用才会产生记录。关闭后隐藏已有记录，并停止新增。",labels,new Choice(){public void pick(int i){App a=eligible.get(i);history.appEnabled(a.pkg,!history.appEnabled(a.pkg));render();showMediaApps();}});}
+    boolean hasInputs(){for(App a:apps)if(a.port!=null)return true;return false;}
+    void focusInputs(){for(ArrayList<View> row:focusRows)for(View v:row)if(v instanceof Tile&&((Tile)v).group.id.equals("inputs")){v.requestFocus();return;}Intent fallback=SystemEntrypoints.inputSettings(this);if(fallback!=null)launch(fallback,"系统输入源设置");else Toast.makeText(this,"请使用遥控器输入源键或电视设置",Toast.LENGTH_LONG).show();}
     String inputStatus(InputSources.Port p){if(p.enumName.endsWith("DTV")||p.enumName.endsWith("ATV"))return "天线 / 有线电视";return p.state==0?(p.number>0?"未接入":"未检测到信号"):p.state==1?(p.device.isEmpty()?"已接入 · 设备名未知":p.device):"状态暂不可读";}
     void refreshInputs(){
-        if(inputSources==null)return;for(InputSources.Port p:inputSources.scan()){App a=appMap.get("input:"+p.id);if(a!=null)a.port=p;}
+        if(inputSources==null)return;for(InputSources.Port p:inputSources.scan()){App a=appMap.get(p.key());if(a!=null){a.port=p;a.intent=p.intent;}}
         for(ArrayList<View> row:focusRows)for(View v:row)if(v instanceof Tile&&((Tile)v).app.port!=null){Tile t=(Tile)v;t.setContentDescription(t.app.name+"，"+inputStatus(t.app.port));t.invalidate();}
         View focused=getCurrentFocus();if(focused instanceof Tile&&((Tile)focused).app.port!=null)updateSelection(focused);
     }
     void addCategory(final Group group,String title,boolean includeHidden){
-        ArrayList<App> items=groupApps(group,includeHidden);LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);heading.setPadding(dp(12),0,dp(12),dp(4));TextView label=text(title,17,WHITE);label.setTypeface(Typeface.create("sans-serif-medium",0));heading.addView(label,new LinearLayout.LayoutParams(0,-2,1));heading.addView(text(items.size()+(group.id.equals("inputs")?" 个入口":" 个应用"),11,0xff9bafbc));content.addView(heading);
+        if(group==null||(group.id.equals("inputs")&&!hasInputs()))return;
+        ArrayList<App> items=groupApps(group,includeHidden);SectionHeading heading=new SectionHeading(this);sectionHeadings.add(heading);heading.setGravity(Gravity.CENTER_VERTICAL);heading.setPadding(dp(12),0,dp(12),dp(4));TextView label=text(title,17,WHITE);label.setTypeface(Typeface.create("sans-serif-medium",0));heading.addView(label,new LinearLayout.LayoutParams(0,-2,1));heading.addView(text(items.size()+(group.id.equals("inputs")?" 个入口":" 个应用"),11,0xff9bafbc));content.addView(heading);
         boolean row=group.row&&!manage;if(items.isEmpty()){TextView empty=text(group.id.equals("favorites")?"长按应用卡片，添加到常用":"在应用菜单中添加到此分类",14,MUTED);empty.setPadding(dp(20),dp(25),dp(20),dp(25));content.addView(empty);return;}
         if(row){
-            HorizontalScrollView h=new HorizontalScrollView(this);h.setHorizontalScrollBarEnabled(false);h.setClipChildren(false);h.setClipToPadding(false);CardRow line=new CardRow(this);cardRows.add(line);line.setPadding(dp(12),dp(6),dp(12),dp(10));line.setClipChildren(false);line.setClipToPadding(false);ArrayList<View> focuses=new ArrayList<>();
+            PaneStrip h=new PaneStrip(this);CardRow line=new CardRow(this);line.heading=heading;heading.row=line;cardRows.add(line);line.setPadding(dp(12),dp(6),dp(12),dp(10));line.setClipChildren(false);line.setClipToPadding(false);ArrayList<View> focuses=new ArrayList<>();
             boolean sources=group.id.equals("inputs");int cardWidth=(designWidth-96-(sources?3:gridColumns-1)*18)/(sources?4:gridColumns);
             for(int i=0;i<items.size();i++){App a=items.get(i);Tile tile=makeTile(a,group);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(cardWidth),dp(sources?84:cardWidth*9f/16+27));lp.rightMargin=i<items.size()-1?dp(18):0;line.addView(tile,lp);focuses.add(tile);}h.addView(line);content.addView(h);focusRows.add(focuses);
         }else{
             int available=designWidth-96;int cardWidth=(available-(gridColumns-1)*18)/gridColumns;
-            for(int i=0;i<items.size();i+=gridColumns){CardRow line=new CardRow(this);cardRows.add(line);line.setPadding(dp(12),dp(6),dp(12),dp(24));line.setClipChildren(false);line.setClipToPadding(false);ArrayList<View> focuses=new ArrayList<>();
+            for(int i=0;i<items.size();i+=gridColumns){CardRow line=new CardRow(this);if(i==0){line.heading=heading;heading.row=line;}cardRows.add(line);line.setPadding(dp(12),dp(6),dp(12),dp(24));line.setClipChildren(false);line.setClipToPadding(false);ArrayList<View> focuses=new ArrayList<>();
                 for(int j=0;j<gridColumns;j++){View v;if(i+j<items.size()){v=makeTile(items.get(i+j),group);focuses.add(v);}else v=new View(this);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(cardWidth),dp(cardWidth*9f/16+27));lp.rightMargin=j<gridColumns-1?dp(18):0;line.addView(v,lp);}content.addView(line);focusRows.add(focuses);
             }
         }
@@ -192,22 +273,53 @@ public class MainActivity extends Activity {
     }
     View tool(String label,String tag,int glyph,final Runnable action){final Tool t=new Tool(this,label,glyph);t.setTag(tag);t.setId(View.generateViewId());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(92),dp(36));lp.leftMargin=dp(10);t.setLayoutParams(lp);t.setOnClickListener(new View.OnClickListener(){public void onClick(View v){action.run();}});return t;}
     void focusChanged(final View v,boolean focused){
-        v.animate().scaleX(focused?1.045f:1).scaleY(focused?1.045f:1).setDuration(180).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();v.setTranslationZ(focused?dp(8):0);v.invalidate();if(focused){selected=(String)v.getTag();updateSelection(v);if(hint!=null)hint.setText(!moving.isEmpty()?"方向键移动卡片    确认键或返回键完成排序":manage?"确认键隐藏 / 显示应用    返回键完成整理":"方向键选择    确认键打开    长按确认键整理");v.post(new Runnable(){public void run(){if(v.isFocused()&&scroll!=null){if(v instanceof Tile)scroll.revealTile(v);else scroll.scrollTo(0,0);Rect r=new Rect(-dp(8),-dp(8),v.getWidth()+dp(8),v.getHeight()+dp(8));v.requestRectangleOnScreen(r,false);}}});}
+        v.animate().scaleX(focused?1.045f:1).scaleY(focused?1.045f:1).setDuration(180).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();v.setTranslationZ(focused?dp(8):0);v.invalidate();if(focused){selected=(String)v.getTag();updateSelection(v);if(hint!=null)hint.setText(!moving.isEmpty()?"方向键移动卡片    确认键或返回键完成排序":manage?"确认键隐藏 / 显示应用    返回键完成整理":"方向键选择    确认键打开    长按确认键整理");v.post(new Runnable(){public void run(){if(v.isFocused()&&scroll!=null){if(v.getParent() instanceof CardRow)scroll.revealTile(v);else scroll.scrollTo(0,0);Rect r=new Rect(-dp(8),-dp(8),v.getWidth()+dp(8),v.getHeight()+dp(8));v.requestRectangleOnScreen(r,false);if(v.getParent() instanceof CardRow&&((View)v.getParent()).getParent() instanceof RecentStrip)((RecentStrip)((View)v.getParent()).getParent()).scrollTo(Math.max(0,v.getLeft()-dp(12)),0);}}});}
     }
     // Keep partially visible rows in the focus graph, but paint only complete cards.
     // This rule applies to every scroll position, including repeated up/down moves.
+    class SectionHeading extends LinearLayout {
+        CardRow row;
+        SectionHeading(Context c){super(c);}
+        @Override protected void dispatchDraw(Canvas canvas){if(row==null||row.fullyVisible())super.dispatchDraw(canvas);}
+    }
+    class PaneStrip extends HorizontalScrollView {
+        private final Paint indicatorPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path indicatorPath=new Path();
+        PaneStrip(Context c){super(c);setHorizontalScrollBarEnabled(false);setClipChildren(true);setClipToPadding(true);}
+        @Override protected void dispatchDraw(Canvas canvas){
+            // Ancestors allow focus enlargement, so enforce this pane's viewport explicitly.
+            int saved=canvas.save();canvas.clipRect(getScrollX(),getScrollY(),getScrollX()+getWidth(),getScrollY()+getHeight());super.dispatchDraw(canvas);
+            if(getChildCount()>0&&getChildAt(0) instanceof CardRow){
+                CardRow row=(CardRow)getChildAt(0);
+                if(row.fullyVisible()&&row.getChildCount()>0){
+                    View first=row.getChildAt(0),last=row.getChildAt(row.getChildCount()-1);float y=getScrollY()+first.getTop()+(first.getHeight()-dp(first instanceof RecentTile?48:27))/2f;
+                    // Ignore blank edge padding; arrows describe hidden cards, not spare scroll range.
+                    if(first.getLeft()<getScrollX()-dp(1))drawMore(canvas,getScrollX()+dp(16),y,-1);
+                    if(last.getRight()>getScrollX()+getWidth()+dp(1))drawMore(canvas,getScrollX()+getWidth()-dp(16),y,1);
+                }
+            }
+            canvas.restoreToCount(saved);
+        }
+        void drawMore(Canvas canvas,float x,float y,int direction){indicatorPaint.setStyle(Paint.Style.FILL);indicatorPaint.setColor(0xcc172633);canvas.drawCircle(x,y,dp(12),indicatorPaint);indicatorPaint.setStyle(Paint.Style.STROKE);indicatorPaint.setStrokeWidth(dp(1.8f));indicatorPaint.setStrokeCap(Paint.Cap.ROUND);indicatorPaint.setStrokeJoin(Paint.Join.ROUND);indicatorPaint.setColor(0xffedf4f6);indicatorPath.reset();indicatorPath.moveTo(x-direction*dp(3),y-dp(5));indicatorPath.lineTo(x+direction*dp(3),y);indicatorPath.lineTo(x-direction*dp(3),y+dp(5));canvas.drawPath(indicatorPath,indicatorPaint);}
+        @Override protected void onScrollChanged(int x,int y,int oldX,int oldY){super.onScrollChanged(x,y,oldX,oldY);invalidate();}
+    }
+    class RecentStrip extends PaneStrip {
+        RecentStrip(Context c){super(c);}
+    }
     class CardRow extends LinearLayout {
+        SectionHeading heading;
+        View visibilityBand;
         CardRow(Context c){super(c);}
         Rect cardBounds(){
             Rect bounds=new Rect();if(getChildCount()==0||content==null)return bounds;
+            if(visibilityBand!=null){bounds.set(0,0,visibilityBand.getWidth(),visibilityBand.getHeight());content.offsetDescendantRectToMyCoords(visibilityBand,bounds);bounds.inset(0,-dp(8));return bounds;}
             View card=getChildAt(0);bounds.set(0,0,card.getWidth(),card.getHeight());
-            content.offsetDescendantRectToMyCoords(card,bounds);bounds.inset(0,-dp(8));return bounds;
+            content.offsetDescendantRectToMyCoords(card,bounds);if(heading!=null){Rect title=new Rect(0,0,heading.getWidth(),heading.getHeight());content.offsetDescendantRectToMyCoords(heading,title);bounds.top=Math.min(bounds.top,title.top);}bounds.inset(0,-dp(8));return bounds;
         }
         @Override protected void dispatchDraw(Canvas canvas){
-            Rect bounds=cardBounds();if(scroll==null||bounds.height()<=0)return;
-            int top=scroll.getScrollY(),bottom=top+scroll.getHeight();
-            if(bounds.top>=top&&bounds.bottom<=bottom)super.dispatchDraw(canvas);
+            if(fullyVisible())super.dispatchDraw(canvas);
         }
+        boolean fullyVisible(){Rect bounds=cardBounds();if(scroll==null||bounds.height()<=0)return false;int top=scroll.getScrollY(),bottom=top+scroll.getHeight();return bounds.top>=top&&bounds.bottom<=bottom;}
     }
     class CardScroll extends ScrollView {
         CardScroll(Context c){super(c);}
@@ -225,10 +337,11 @@ public class MainActivity extends Activity {
         @Override protected void onScrollChanged(int x,int y,int oldX,int oldY){
             super.onScrollChanged(x,y,oldX,oldY);
             // Rebuild row display lists when scrolling changes their visibility.
-            for(CardRow row:cardRows)row.invalidate();
+            for(CardRow row:cardRows){row.invalidate();if(row.getParent() instanceof PaneStrip)((PaneStrip)row.getParent()).invalidate();}
+            for(SectionHeading heading:sectionHeadings)heading.invalidate();
         }
     }
-    void updateSelection(View v){if(selectionTitle==null)return;if(v instanceof Tile){Tile t=(Tile)v;selectionTitle.setText(t.app.name);selectionSubtitle.setText(t.app.port==null?t.group.title:inputStatus(t.app.port));}else if(v instanceof Tool){selectionTitle.setText(((Tool)v).label);selectionSubtitle.setText("主页快捷入口");}}
+    void updateSelection(View v){if(selectionTitle==null)return;if(v instanceof Tile){Tile t=(Tile)v;selectionTitle.setText(t.app.name);selectionSubtitle.setText(t.app.port==null?t.group.title:inputStatus(t.app.port));}else if(v instanceof RecentTile){PlaybackRecord r=((RecentTile)v).record;selectionTitle.setText(r.title);selectionSubtitle.setText(r.service()+" · "+r.details());}else if(v instanceof WeatherButton){selectionTitle.setText("天气");selectionSubtitle.setText("确认键查看预报和城市设置");}else if(v instanceof Tool){selectionTitle.setText(((Tool)v).label);selectionSubtitle.setText("主页快捷入口");}}
     @Override public boolean dispatchKeyEvent(KeyEvent e){
         int code=e.getKeyCode();boolean arrow=code==19||code==20||code==21||code==22;if(arrow&&e.getAction()==KeyEvent.ACTION_DOWN){View focused=getCurrentFocus();if(!moving.isEmpty()&&focused instanceof Tile){moveApp((Tile)focused,code);return true;}
             for(int r=0;r<focusRows.size();r++){ArrayList<View> row=focusRows.get(r);int i=row.indexOf(focused);if(i<0)continue;int nr=r,ni=i;if(code==21)ni--;else if(code==22)ni++;else if(code==19)nr--;else nr++;if(nr>=0&&nr<focusRows.size()){ArrayList<View> next=focusRows.get(nr);if(nr!=r)ni=Math.min(ni,next.size()-1);if(ni>=0&&ni<next.size())next.get(ni).requestFocus();}return true;}
@@ -245,10 +358,12 @@ public class MainActivity extends Activity {
         TextView back=text("返回键关闭",12,MUTED);back.setPadding(dp(16),dp(15),0,0);box.addView(back);current.setContentView(box);Window w=current.getWindow();if(w!=null){w.setBackgroundDrawableResource(android.R.color.transparent);w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);WindowManager.LayoutParams lp=w.getAttributes();lp.width=dp(365);lp.height=-1;lp.gravity=Gravity.RIGHT;lp.dimAmount=.45f;w.setAttributes(lp);w.getDecorView().setSystemUiVisibility(5894);}current.setOnDismissListener(new DialogInterface.OnDismissListener(){public void onDismiss(DialogInterface d){if(sheet==current)sheet=null;}});current.show();if(options.getChildCount()>0)options.getChildAt(0).requestFocus();
     }
     Drawable panelButton(boolean f){GradientDrawable d=new GradientDrawable();d.setCornerRadius(dp(10));d.setColor(f?0xffe7edf6:0xff202d42);return d;}
-    void showSettings(){panel("桌面设置","按你的习惯，整理自己的主页",new String[]{"整理应用","管理分类","背景与卡片","电视系统设置","返回原厂桌面"},new Choice(){public void pick(int i){if(i==0){manage=true;selected="";render();}else if(i==1)showGroups();else if(i==2)showAppearance();else if(i==3)openSettings();else openOriginal();}});}
+    void showSettings(){panel("桌面设置","按你的习惯，整理自己的主页",new String[]{"整理应用","管理分类","背景与卡片","天气与继续播放","电视系统设置","打开其他桌面","默认桌面与安装帮助"},new Choice(){public void pick(int i){if(i==0){manage=true;selected="";render();}else if(i==1)showGroups();else if(i==2)showAppearance();else if(i==3)showContentSettings();else if(i==4)openSettings();else if(i==5)openOriginal();else showSetup();}});}
     void showAppearance(){panel("背景与卡片","图片缓慢移动，视频静音循环；离开桌面自动暂停",new String[]{"背景 · 自然山湖","自定义图片 / 动态视频",prefs.getBoolean("wallpaper_motion",true)?"图片动效 · 已开启":"图片动效 · 已关闭","配色背景",prefs.getBoolean("banners",true)?"应用横幅 · 已开启":"应用横幅 · 已关闭"},new Choice(){public void pick(int i){if(i==1){chooseWallpaper();return;}if(i==3){chooseTheme();return;}if(i==0)prefs.edit().putString("wallpaper_kind","builtin").apply();else if(i==2)prefs.edit().putBoolean("wallpaper_motion",!prefs.getBoolean("wallpaper_motion",true)).apply();else prefs.edit().putBoolean("banners",!prefs.getBoolean("banners",true)).apply();render();}});}
     void chooseTheme(){panel("配色背景","无需图片或视频，也可使用原来的配色",new String[]{"深海蓝","暮色紫","石墨黑","森林绿"},new Choice(){public void pick(int i){theme=i;prefs.edit().putInt("theme",theme).putString("wallpaper_kind","theme").apply();render();}});}
-    void chooseWallpaper(){panel("自定义背景","选定后保存到电视，之后可以移除 U 盘",new String[]{"从 U 盘或本地导入","已保存背景","恢复内置风景"},new Choice(){public void pick(int i){if(i==0){if(checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE},902);else browseRoots();}else if(i==1)browseFolder(wallpapers.library(),wallpapers.library());else{prefs.edit().putString("wallpaper_kind","builtin").apply();render();}}});}
+    void chooseWallpaper(){panel("自定义背景","选定后保存到电视，之后可以移除 U 盘",new String[]{"系统文件选择器","U 盘 / 旧系统文件浏览","已保存背景","恢复内置风景"},new Choice(){public void pick(int i){if(i==0){pickDocument();return;}if(i==1){if(checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE},902);else browseRoots();}else if(i==2)browseFolder(wallpapers.library(),wallpapers.library());else{prefs.edit().putString("wallpaper_kind","builtin").apply();render();}}});}
+    void pickDocument(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*").putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"image/*","video/*"}).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);try{startActivityForResult(i,903);}catch(Exception e){Toast.makeText(this,"系统没有文件选择器，可使用 U 盘 / 旧系统文件浏览",Toast.LENGTH_LONG).show();chooseWallpaper();}}
+    @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==903&&result==RESULT_OK&&data!=null&&data.getData()!=null){ProgressDialog progress=ProgressDialog.show(this,"正在导入背景","正在复制选定文件…",true,false);wallpapers.importDocument(data.getData(),(ok,video)->{progress.dismiss();Toast.makeText(this,ok?"已应用背景":"导入失败，请选择图片或视频（图片 50 MB、视频 400 MB 内）",Toast.LENGTH_LONG).show();if(ok)render();});}}
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(request==902){if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)browseRoots();else Toast.makeText(this,"未授权，仍可使用内置风景和已保存背景",Toast.LENGTH_LONG).show();}}
     void browseRoots(){
         final ArrayList<File> roots=new ArrayList<>();final ArrayList<String> names=new ArrayList<>();File local=Environment.getExternalStorageDirectory();if(local!=null){roots.add(local);names.add("电视本地文件");}File[] storage=new File("/storage").listFiles();if(storage!=null)for(File f:storage){String n=f.getName();if(f.isDirectory()&&f.canRead()&&!n.equals("emulated")&&!n.equals("self")){roots.add(f);names.add("U 盘 / 存储 · "+n);}}roots.add(wallpapers.library());names.add("已保存背景");panel("选择存储位置","只读取你选定的图片或视频",names.toArray(new String[0]),new Choice(){public void pick(int i){browseFolder(roots.get(i),roots.get(i));}});
@@ -265,10 +380,13 @@ public class MainActivity extends Activity {
     void editGroup(final Group g){ArrayList<String> options=new ArrayList<>(Arrays.asList("重命名",g.row?"改为网格":"改为横向一排","分类上移","分类下移"));if(!g.id.equals("favorites")&&!g.id.equals("all")&&!g.id.equals("inputs"))options.add("删除此分类");panel(g.title,"只调整桌面的分类，不改变应用状态",options.toArray(new String[0]),new Choice(){public void pick(int i){if(i==0){editName(g);return;}if(i==1)g.row=!g.row;if(i==2||i==3){int at=groups.indexOf(g),next=at+(i==2?-1:1);if(next>=0&&next<groups.size())Collections.swap(groups,at,next);}if(i==4)groups.remove(g);saveGroups();render();showGroups();}});}
     void showAppMenu(final App a,final Group g){panel(a.name,a.port==null?"应用操作":inputStatus(a.port),new String[]{a.port==null?"打开应用":"进入输入源",favorites.contains(a.pkg)?"从常用移除":"添加到常用","移动位置",hidden.contains(a.pkg)?"显示在主页":"从主页隐藏","添加 / 移出分类",a.port==null?"应用信息":"刷新接入状态"},new Choice(){public void pick(int i){if(i==0){launch(a.intent,a.name);return;}if(i==1){if(favorites.contains(a.pkg))favorites.remove(a.pkg);else favorites.add(a.pkg);save();render();}else if(i==2){moving=g.id+"|"+a.pkg;selected=moving;render();}else if(i==3){if(hidden.contains(a.pkg))hidden.remove(a.pkg);else hidden.add(a.pkg);save();render();}else if(i==4)chooseMembership(a);else if(i==5){if(a.port==null)launch(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+a.pkg)),"应用信息");else refreshInputs();}}});}
     void chooseMembership(final App a){final ArrayList<Group> custom=new ArrayList<>();ArrayList<String> choices=new ArrayList<>();for(Group g:groups)if(!g.id.equals("favorites")&&!g.id.equals("all")&&!g.id.equals("inputs")){custom.add(g);boolean member=prefs.getStringSet("members_"+g.id,Collections.<String>emptySet()).contains(a.pkg);choices.add((member?"移出 · ":"添加到 · ")+g.title);}if(custom.isEmpty()){addGroup();return;}panel("应用分类",a.name,choices.toArray(new String[0]),new Choice(){public void pick(int i){Group g=custom.get(i);Set<String> m=new HashSet<>(prefs.getStringSet("members_"+g.id,Collections.<String>emptySet()));if(m.contains(a.pkg))m.remove(a.pkg);else m.add(a.pkg);prefs.edit().putStringSet("members_"+g.id,m).apply();render();}});}
-    void launch(Intent i,String name){try{startActivity(i);}catch(Exception e){Toast.makeText(this,"暂时无法打开"+name,Toast.LENGTH_LONG).show();}}
-    void openPackage(String p){Intent i=getPackageManager().getLeanbackLaunchIntentForPackage(p);if(i==null)i=getPackageManager().getLaunchIntentForPackage(p);if(i==null){Toast.makeText(this,"请通过电视设置或遥控器切换输入源",Toast.LENGTH_LONG).show();return;}launch(i,"");}
-    void openSettings(){launch(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName("com.tcl.settings","com.tcl.settings.ui.MainActivity")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),"设置");}
-    void openOriginal(){launch(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(new ComponentName("com.tcl.cyberui","com.tcl.cyberui.MainActivity")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),"原厂桌面");}
+    void launch(Intent i,String name){try{if(i==null)throw new ActivityNotFoundException();startActivity(i);}catch(Exception e){Toast.makeText(this,"暂时无法打开"+name,Toast.LENGTH_LONG).show();}}
+    void openPackage(String p){Intent i=getPackageManager().getLeanbackLaunchIntentForPackage(p);if(i==null)i=getPackageManager().getLaunchIntentForPackage(p);if(i==null){Toast.makeText(this,"这个应用尚未安装或没有可用入口",Toast.LENGTH_LONG).show();return;}launch(i,"");}
+    void openSettings(){Intent i=SystemEntrypoints.settings(this);if(i!=null)launch(i,"设置");else Toast.makeText(this,"请使用遥控器或原桌面的系统设置入口",Toast.LENGTH_LONG).show();}
+    void showSetup(){String status=SystemEntrypoints.defaultHome(this)?"静幕已是默认桌面":"静幕尚未设为默认桌面";panel("静幕 · 安装帮助",status+"\n\n基础桌面可以直接使用。天气和播放记录默认关闭，可在设置中按需开启。\n\n按 Home 返回桌面、重启后自动进入桌面分别由固件决定。原桌面保持可用，可通过系统默认应用设置恢复。",new String[]{"开始使用","选择默认桌面","天气与继续播放","打开其他桌面","兼容信息"},i->{if(i==1)chooseDefaultHome();else if(i==2)showContentSettings();else if(i==3)openOriginal();else if(i==4)showCompatibility();});}
+    void chooseDefaultHome(){Intent i=SystemEntrypoints.homeSettings(this);if(i!=null){launch(i,"默认桌面设置");return;}panel("默认桌面设置","系统未提供通用的默认桌面设置页。可按 Home 查看是否出现桌面选择，选择静幕并设为始终使用；部分厂商需要使用电脑设置。\n\n恢复时在同一入口选择原桌面即可。",new String[]{"打开电视设置","返回"},n->{if(n==0)openSettings();});}
+    void showCompatibility(){panel("兼容信息","静幕 0.12.0 · Android "+Build.VERSION.RELEASE+"\n"+Build.MANUFACTURER+" "+Build.MODEL+"\n\n输入源："+(hasInputs()?"已发现可用入口":"使用遥控器 / 系统设置")+"\n媒体识别："+(GenericMediaHistory.permission(this)?"已授权":"未授权，可选")+"\n\n基础功能支持 Android 6.0 起。多厂商实机验证仍在进行；输入源、开机桌面和精确续播取决于设备及应用。",new String[]{"默认桌面帮助","返回"},i->{if(i==0)showSetup();});}
+    void openOriginal(){final ArrayList<ResolveInfo> homes=SystemEntrypoints.otherHomes(this);if(homes.isEmpty()){panel("其他桌面","没有检测到可打开的其他桌面。请通过系统默认应用设置恢复；不要停用或卸载原桌面。",new String[]{"打开电视设置","返回"},i->{if(i==0)openSettings();});return;}String[] labels=new String[homes.size()];for(int n=0;n<labels.length;n++)labels[n]=homes.get(n).loadLabel(getPackageManager()).toString();Choice open=n->{ResolveInfo r=homes.get(n);launch(SystemEntrypoints.homeQuery().setComponent(new ComponentName(r.activityInfo.packageName,r.activityInfo.name)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),labels[n]);};if(homes.size()==1)open.pick(0);else panel("打开其他桌面","这次打开不改变默认桌面；长期恢复请到系统默认应用设置选择",labels,open);}
     @Override public void onBackPressed(){if(prefs==null)return;if(!moving.isEmpty()){moving="";render();return;}if(manage){manage=false;selected="";render();return;}panel("返回原厂桌面？","新桌面的设置会自动保存",new String[]{"留在新桌面","返回原厂桌面"},new Choice(){public void pick(int i){if(i==1)openOriginal();}});}
 
     class Tile extends View {
@@ -293,7 +411,7 @@ public class MainActivity extends Activity {
         }
         void drawSource(Canvas c,float x,float y){
             p.setColor(0xffdcebf1);p.setStrokeWidth(dp(1.5f));p.setStyle(Paint.Style.STROKE);
-            if(app.port.number>0){Path port=new Path();port.moveTo(x-dp(12),y-dp(8));port.lineTo(x+dp(12),y-dp(8));port.lineTo(x+dp(9),y+dp(8));port.lineTo(x-dp(9),y+dp(8));port.close();c.drawPath(port,p);for(int i=0;i<5;i++)c.drawLine(x+dp((i-2)*4),y-dp(3),x+dp((i-2)*4),y+dp(3),p);}
+            if(app.port.number>0||app.port.enumName.contains("HDMI")){Path port=new Path();port.moveTo(x-dp(12),y-dp(8));port.lineTo(x+dp(12),y-dp(8));port.lineTo(x+dp(9),y+dp(8));port.lineTo(x-dp(9),y+dp(8));port.close();c.drawPath(port,p);for(int i=0;i<5;i++)c.drawLine(x+dp((i-2)*4),y-dp(3),x+dp((i-2)*4),y+dp(3),p);}
             else if(app.port.enumName.contains("AV")){for(int i=0;i<3;i++){float xx=x+dp((i-1)*9);c.drawCircle(xx,y,dp(3.3f),p);c.drawLine(xx,y+dp(5),xx,y+dp(10),p);}}
             else{c.drawRoundRect(new RectF(x-dp(12),y-dp(8),x+dp(12),y+dp(8)),dp(3),dp(3),p);c.drawLine(x,y-dp(8),x-dp(7),y-dp(15),p);c.drawLine(x,y-dp(8),x+dp(7),y-dp(15),p);c.drawLine(x-dp(5),y+dp(12),x+dp(5),y+dp(12),p);}
             p.setStyle(Paint.Style.FILL);

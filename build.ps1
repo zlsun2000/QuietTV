@@ -8,7 +8,11 @@ param(
 $ErrorActionPreference='Stop'
 $root=$PSScriptRoot
 $tools=$BuildTools
+$sdkRoot=$env:ANDROID_HOME
+if(-not $sdkRoot){$sdkRoot=$env:ANDROID_SDK_ROOT}
+if(-not $tools -and $sdkRoot){$candidates=@(Get-ChildItem (Join-Path $sdkRoot 'build-tools') -Directory -ErrorAction SilentlyContinue | Where-Object {$_.Name -match '^\d+\.\d+\.\d+$'} | Sort-Object {[version]$_.Name} -Descending);if($candidates.Count){$tools=$candidates[0].FullName}}
 if(-not $tools){$tools=Join-Path (Split-Path $root) 'android-tools\android-11'}
+if(-not $AndroidJar -and $sdkRoot){$AndroidJar=Join-Path $sdkRoot 'platforms\android-28\android.jar'}
 if(-not $AndroidJar){$AndroidJar=Join-Path (Split-Path $root) 'android-tools\android-9\android.jar'}
 if(-not $JavaBin){
     if($env:JAVA_HOME){$JavaBin=Join-Path $env:JAVA_HOME 'bin'}
@@ -26,6 +30,11 @@ if(-not $KeystorePassword){
 }
 if(-not $KeystorePassword){throw 'A signing password is required.'}
 $build=Join-Path $root 'build'
+# A clean output prevents deleted sources/classes from leaking into a later APK.
+# Validate the exact target before any recursive removal.
+$expectedBuild=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'build'))
+if([IO.Path]::GetFullPath($build) -ne $expectedBuild){throw 'Unexpected build directory'}
+if(Test-Path -LiteralPath $build){$item=Get-Item -LiteralPath $build;if($item.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Build directory cannot be a link'};Remove-Item -LiteralPath $build -Recurse -Force}
 foreach($dir in @($build,"$build\gen","$build\classes","$build\dex")){New-Item -ItemType Directory -Path $dir -Force | Out-Null}
 function Check([string]$step){if($LASTEXITCODE -ne 0){throw "Build failed: $step"}}
 & "$tools\aapt.exe" package -f -M "$root\AndroidManifest.xml" -S "$root\res" -I $androidJar -J "$build\gen" -F "$build\resources.apk"

@@ -1,0 +1,47 @@
+name: Build and compatibility checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [28, 30]
+    env:
+      QUIETTV_KEYSTORE_PASSWORD: quiettv-ci-ephemeral-password
+      QUIETTV_RUN_CHECKS: '1'
+      QUIETTV_EMULATOR_TESTS: '1'
+      QUIETTV_EMULATOR_IMAGE: system-images;android-${{ matrix.api }};android-tv;x86
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install official SDK components
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-28' 'build-tools;34.0.0' emulator "$QUIETTV_EMULATOR_IMAGE"
+          echo "QUIETTV_BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0" >> "$GITHUB_ENV"
+          sudo chmod 666 /dev/kvm
+      - name: Clean build and core checks
+        run: bash build.sh
+      - name: Fresh install, remote navigation, document import and upgrade
+        run: bash tests/device/run.sh
+      - name: Preserve emulator evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: emulator-evidence-api-${{ matrix.api }}
+          path: build/ci-artifacts/
+          retention-days: 7
+          if-no-files-found: ignore

@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.quiettv.checks">
+    <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28" />
+    <application android:label="QuietTV isolated checks">
+        <provider android:name="local.quiettv.launcher.CheckDocuments" android:authorities="local.quiettv.checks.documents" android:exported="true" />
+    </application>
+    <instrumentation android:name="local.quiettv.launcher.DeviceChecks" android:targetPackage="local.quiettv.launcher" />
+</manifest>

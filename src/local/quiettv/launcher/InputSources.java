@@ -1,6 +1,10 @@
 package local.quiettv.launcher;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.ComponentName;
+import android.media.tv.*;
+import android.os.Build;
 import java.util.*;
 import java.lang.reflect.*;
 import java.io.*;
@@ -8,7 +12,8 @@ import java.io.*;
 /** Reads TCL input metadata only; switching is delegated to the exported TV activity. */
 final class InputSources {
     static final class Port {
-        int id,number,state=-1; String name,device="",enumName; Object source;
+        int id,number,state=-1; String name,device="",enumName,inputId=""; Object source;Intent intent;
+        String key(){return "input:"+(inputId.isEmpty()?String.valueOf(id):inputId);}
     }
     private final Context context;
     private Class<?> sourceClass;
@@ -24,6 +29,8 @@ final class InputSources {
     ArrayList<Port> scan(){
         ArrayList<Port> result=new ArrayList<>();diagnostics.setLength(0);
         try{
+            Intent tv=new Intent().setComponent(new ComponentName("com.tcl.tv","com.tcl.tv.TVActivity"));
+            if(!SystemEntrypoints.available(context,tv))return standardInputs();
             sourceClass=Class.forName("com.tcl.tvmanager.vo.EnTCLInputSource");
             if(common==null)common=manager("com.tcl.tvmanager.TTvCommonManager");
             if(properties==null)properties=call(manager("com.tcl.tvmanager.TvManager"),"getProperty",new Class<?>[0]);
@@ -32,17 +39,13 @@ final class InputSources {
             String configured=property("ro.sita.cfg.model.Apps.SOURCE_SUPPORT");
             String legacy=property("ro.sita.model.SourceManager.SourceName");
             diagnostics.append("SOURCE_SUPPORT=").append(configured).append("\nSourceName=").append(legacy).append('\n');
-            LinkedHashSet<String> allowed=new LinkedHashSet<>();
-            String config=!configured.isEmpty()?configured:legacy;
-            java.util.regex.Matcher match=java.util.regex.Pattern.compile("(?i)(HDMI\\s*[1-4]|AV\\s*[1-2]|DTV|ATV|\\bTV\\b)").matcher(config);
-            while(match.find())allowed.add(match.group(1).replace(" ","").toUpperCase(Locale.ROOT));
-            // Verified 50F295C-JN ports; never invent an extra HDMI port if metadata is absent.
-            if(allowed.isEmpty()) {allowed.add("DTV");allowed.add("HDMI1");allowed.add("HDMI2");allowed.add("AV1");diagnostics.append("Using verified 50F295C-JN source list\n");}
+            LinkedHashSet<String> allowed=DevicePolicy.tclPorts(configured,legacy,Build.MODEL);
             for(String name:allowed){
                 String enumName="EN_TCL_"+(name.equals("TV")?"DTV":name);
                 Object source=byName.get(enumName);if(source==null)continue;
                 Port p=new Port();p.source=source;p.enumName=enumName;p.id=((Enum<?>)source).ordinal();p.name=name.equals("DTV")||name.equals("TV")?"TV":name.equals("ATV")?"模拟 TV":name.replace("HDMI","HDMI ").replace("AV","AV ");
                 if(name.startsWith("HDMI"))p.number=Integer.parseInt(name.substring(4));
+                p.intent=new Intent(tv).putExtra("targetSourceId",p.id).putExtra("referer",context.getPackageName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 try{Object state=call(common,"isInserted",new Class<?>[]{sourceClass},source);p.state=Boolean.TRUE.equals(state)?1:0;}
                 catch(Exception e){diagnostics.append("status ").append(name).append(": ").append(error(e)).append('\n');}
                 result.add(p);
@@ -50,7 +53,24 @@ final class InputSources {
             readDeviceNames(result);
             for(Port p:result)diagnostics.append(p.name).append(" id=").append(p.id).append(" state=").append(p.state).append(" device=").append(p.device).append('\n');
         }catch(Throwable e){diagnostics.append("Initialization: ").append(error(e)).append('\n');}
-        writeDiagnostics();return result;
+        writeDiagnostics();return result.isEmpty()?standardInputs():result;
+    }
+    private ArrayList<Port> standardInputs(){
+        ArrayList<Port> result=new ArrayList<>();
+        try{TvInputManager manager=(TvInputManager)context.getSystemService(Context.TV_INPUT_SERVICE);if(manager==null)return result;
+            for(TvInputInfo info:manager.getTvInputList()){
+                // A registered input is usable here only when a TV player can handle its URI.
+                if(!info.isPassthroughInput())continue;
+                Intent view=new Intent(Intent.ACTION_VIEW,TvContract.buildChannelUriForPassthroughInput(info.getId()));
+                if(!SystemEntrypoints.available(context,view))continue;
+                Port p=new Port();p.inputId=info.getId();p.enumName=info.getType()==TvInputInfo.TYPE_HDMI?"ANDROID_HDMI":"ANDROID_INPUT";
+                CharSequence label=info.loadCustomLabel(context);if(label==null||label.length()==0)label=info.loadLabel(context);p.name=label==null?"输入源":label.toString();
+                int state=manager.getInputState(info.getId());p.state=state==TvInputManager.INPUT_STATE_CONNECTED?1:state==TvInputManager.INPUT_STATE_DISCONNECTED?0:-1;
+                // Public TvInputInfo does not guarantee a CEC device name or physical port number.
+                // Keep them unknown rather than depending on a hidden system API.
+                p.intent=view.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);result.add(p);
+            }
+        }catch(Exception ignored){}return result;
     }
     private String property(String key){
         try{String v=String.valueOf(call(properties,"get",new Class<?>[]{String.class,String.class},key,""));return v.equals("null")?"":v.trim();}

@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.SharedPreferences;
 import android.graphics.*;
 import android.media.MediaPlayer;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.*;
 import android.widget.*;
 import android.animation.ValueAnimator;
@@ -19,6 +21,21 @@ final class Wallpapers {
     private Bitmap cached;private String cachedKey="",loadingKey="";
     private MediaPlayer player;private Surface surface;private ValueAnimator motion;
     private boolean active=false,disposed=false,videoFailed=false;
+    private boolean videoReady=false;
+    private int videoLoops=0,videoEndFallbacks=0;
+    private long videoFrames=0;
+    private final Handler videoHandler=new Handler(Looper.getMainLooper());
+    // Some TV decoders stop at the last frame without sending completion.
+    // Only inspect the tail after a full playback interval has elapsed.
+    private final Runnable videoEndGuard=new Runnable(){public void run(){
+        final MediaPlayer p=player;
+        if(p==null||!active||disposed||!videoReady)return;
+        try{int duration=p.getDuration(),position=p.getCurrentPosition();
+            int margin=Math.min(1000,Math.max(100,duration/10));
+            if(duration>0&&position>=duration-margin){videoEndFallbacks++;repeatVideo(p);}
+            else videoHandler.postDelayed(this,500);
+        }catch(Exception e){if(player==p)failedVideo();}
+    }};
     private int videoWidth,videoHeight;
     Wallpapers(Activity a,SharedPreferences p){owner=a;prefs=p;}
     String kind(){return prefs.getString("wallpaper_kind","builtin");}
@@ -35,7 +52,7 @@ final class Wallpapers {
                 public void onSurfaceTextureAvailable(SurfaceTexture t,int w,int h){if(active)play();}
                 public void onSurfaceTextureSizeChanged(SurfaceTexture t,int w,int h){cropVideo();}
                 public boolean onSurfaceTextureDestroyed(SurfaceTexture t){if(texture==attachedTexture)releasePlayer();return true;}
-                public void onSurfaceTextureUpdated(SurfaceTexture t){}
+                public void onSurfaceTextureUpdated(SurfaceTexture t){if(texture==attachedTexture&&player!=null&&active)videoFrames++;}
             });
         }
         layer.addView(new Scrim(owner),new FrameLayout.LayoutParams(-1,-1));if(active)start();status();
@@ -61,15 +78,28 @@ final class Wallpapers {
         final PhotoView target=image;motion=ValueAnimator.ofFloat(0,1);motion.setDuration(45000);motion.setRepeatMode(ValueAnimator.REVERSE);motion.setRepeatCount(ValueAnimator.INFINITE);motion.setInterpolator(new android.view.animation.LinearInterpolator());motion.addUpdateListener(new ValueAnimator.AnimatorUpdateListener(){long last;public void onAnimationUpdate(ValueAnimator a){long now=android.os.SystemClock.uptimeMillis();if(now-last<33)return;last=now;target.setProgress((Float)a.getAnimatedValue());}});motion.start();
     }
     private void play(){
-        if(player!=null||!active||texture==null||!texture.isAvailable())return;videoFailed=false;
-        try{surface=new Surface(texture.getSurfaceTexture());player=new MediaPlayer();player.setSurface(surface);player.setDataSource(prefs.getString("wallpaper_path",""));player.setVolume(0,0);player.setLooping(true);
-            player.setOnPreparedListener(new MediaPlayer.OnPreparedListener(){public void onPrepared(MediaPlayer p){if(player!=p)return;videoWidth=p.getVideoWidth();videoHeight=p.getVideoHeight();cropVideo();p.setVolume(0,0);if(active)p.start();status();}});
-            player.setOnErrorListener(new MediaPlayer.OnErrorListener(){public boolean onError(MediaPlayer p,int what,int extra){failedVideo();return true;}});player.prepareAsync();
+        if(player!=null||!active||texture==null||!texture.isAvailable())return;videoFailed=false;videoLoops=0;videoEndFallbacks=0;videoFrames=0;
+        prepareVideo(false);
+    }
+    private void prepareVideo(final boolean repeating){
+        if(player!=null||!active||disposed||texture==null||!texture.isAvailable())return;
+        try{if(surface==null)surface=new Surface(texture.getSurfaceTexture());player=new MediaPlayer();player.setSurface(surface);player.setDataSource(prefs.getString("wallpaper_path",""));player.setVolume(0,0);player.setLooping(false);
+            player.setOnPreparedListener(new MediaPlayer.OnPreparedListener(){public void onPrepared(MediaPlayer p){if(player!=p)return;try{videoReady=true;videoWidth=p.getVideoWidth();videoHeight=p.getVideoHeight();cropVideo();p.setVolume(0,0);if(active){p.start();if(repeating)videoLoops++;armVideoEndGuard(p);}status();}catch(Exception e){if(player==p)failedVideo();}}});
+            player.setOnCompletionListener(new MediaPlayer.OnCompletionListener(){public void onCompletion(MediaPlayer p){repeatVideo(p);}});
+            player.setOnErrorListener(new MediaPlayer.OnErrorListener(){public boolean onError(MediaPlayer p,int what,int extra){if(player==p)failedVideo();return true;}});player.prepareAsync();
         }catch(Exception e){failedVideo();}
+    }
+    private void armVideoEndGuard(MediaPlayer p){videoHandler.removeCallbacks(videoEndGuard);if(player==p&&active&&!disposed&&videoReady)videoHandler.postDelayed(videoEndGuard,Math.max(250L,(long)p.getDuration()+350L));}
+    private void repeatVideo(MediaPlayer p){
+        if(player!=p||!active||disposed||!videoReady)return;
+        // The Amlogic video-only path can acknowledge seekTo(0) without
+        // rewinding its decoder. Recreate it while retaining the last texture.
+        releaseDecoder();prepareVideo(true);
     }
     private void cropVideo(){if(texture==null||videoWidth<=0||videoHeight<=0)return;float w=texture.getWidth(),h=texture.getHeight();if(w==0||h==0)return;float scale=Math.max(w/videoWidth,h/videoHeight);Matrix m=new Matrix();m.setScale(videoWidth*scale/w,videoHeight*scale/h,w/2,h/2);texture.setTransform(m);}
     private void failedVideo(){videoFailed=true;releasePlayer();if(texture!=null)texture.setVisibility(View.GONE);Toast.makeText(owner,"这个视频暂时无法播放，已显示内置风景",Toast.LENGTH_LONG).show();status();}
-    private void releasePlayer(){if(player!=null){try{player.reset();player.release();}catch(Exception ignored){}player=null;}if(surface!=null){surface.release();surface=null;}}
+    private void releaseDecoder(){videoHandler.removeCallbacks(videoEndGuard);videoReady=false;MediaPlayer old=player;player=null;if(old!=null){try{old.release();}catch(Exception ignored){}}}
+    private void releasePlayer(){releaseDecoder();if(surface!=null){surface.release();surface=null;}}
     private void release(){if(motion!=null){motion.cancel();motion=null;}releasePlayer();}
     void importFile(final File source,final Imported callback){
         worker.execute(new Runnable(){public void run(){boolean success=false;File dest=null;boolean isVideo=video(source);try{
@@ -77,14 +107,26 @@ final class Wallpapers {
             if(source.length()>(isVideo?400L:50L)*1024*1024)throw new IOException();
             String lib=library().getCanonicalPath()+File.separator;
             if(source.getCanonicalPath().startsWith(lib))dest=source;
-            else{dest=new File(library(),System.currentTimeMillis()+"-"+source.getName());try(InputStream in=new FileInputStream(source);OutputStream out=new FileOutputStream(dest)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1){if(Thread.currentThread().isInterrupted())throw new IOException();out.write(b,0,n);}}}
+            else{dest=new File(library(),System.currentTimeMillis()+"-"+source.getName());try(InputStream in=new FileInputStream(source);OutputStream out=new FileOutputStream(dest)){byte[] b=new byte[65536];long copied=0;int n;while((n=in.read(b))!=-1){copied+=n;if(copied>(isVideo?400L:50L)*1024*1024||Thread.currentThread().isInterrupted())throw new IOException();out.write(b,0,n);}}}
             if(!isVideo){BitmapFactory.Options o=new BitmapFactory.Options();o.inJustDecodeBounds=true;BitmapFactory.decodeFile(dest.getPath(),o);if(o.outWidth<=0||o.outHeight<=0)throw new IOException();}
             prefs.edit().putString("wallpaper_kind",isVideo?"video":"image").putString("wallpaper_path",dest.getCanonicalPath()).commit();success=true;
         }catch(Exception ignored){if(dest!=null&&!dest.equals(source))dest.delete();}
         final boolean ok=success;final boolean vid=isVideo;owner.runOnUiThread(new Runnable(){public void run(){if(!disposed)callback.done(ok,vid);}});
         }});
     }
-    void status(){try{File dir=owner.getExternalFilesDir(null);if(dir==null)return;String playing="false",looping="false";int position=0,duration=0;try{if(player!=null){playing=String.valueOf(player.isPlaying());looping=String.valueOf(player.isLooping());position=player.getCurrentPosition();duration=player.getDuration();}}catch(Exception ignored){}try(Writer out=new FileWriter(new File(dir,"wallpaper-status.txt"))){out.write("kind="+kind()+"\nactive="+active+"\nphoto_motion="+(motion!=null&&motion.isRunning())+"\nvideo_playing="+playing+"\nvideo_looping="+looping+"\nvideo_position="+position+"\nvideo_duration="+duration+"\nvideo_muted=true\nvideo_failed="+videoFailed+"\nbitmap="+(cached==null?"none":cached.getWidth()+"x"+cached.getHeight())+"\n");}}catch(Exception ignored){}}
+    void importDocument(final android.net.Uri uri,final Imported callback){
+        worker.execute(()->{File dest=null;boolean ok=false,isVideo=false;try{
+            if(!"content".equals(uri.getScheme())&&!"file".equals(uri.getScheme()))throw new IOException();
+            android.content.ContentResolver resolver=owner.getContentResolver();String name="";
+            try(android.database.Cursor cursor=resolver.query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(cursor!=null&&cursor.moveToFirst())name=cursor.getString(0);}catch(Exception ignored){}
+            String extension=WallpaperImportPolicy.extension(resolver.getType(uri),name);if(extension.isEmpty())throw new IOException();isVideo=WallpaperImportPolicy.video(extension);
+            dest=new File(library(),"import-"+System.nanoTime()+"."+extension);
+            try(InputStream in=resolver.openInputStream(uri);OutputStream out=new FileOutputStream(dest)){if(in==null)throw new IOException();byte[] buffer=new byte[65536];long total=0;int count;while((count=in.read(buffer))!=-1){total+=count;if(total>WallpaperImportPolicy.limit(extension)||Thread.currentThread().isInterrupted())throw new IOException();out.write(buffer,0,count);}if(total==0)throw new IOException();}
+            if(!isVideo){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(dest.getPath(),bounds);if(bounds.outWidth<=0||bounds.outHeight<=0)throw new IOException();}
+            prefs.edit().putString("wallpaper_kind",isVideo?"video":"image").putString("wallpaper_path",dest.getCanonicalPath()).commit();ok=true;
+        }catch(Exception ignored){if(dest!=null)dest.delete();}final boolean success=ok,video=isVideo;owner.runOnUiThread(()->{if(!disposed)callback.done(success,video);});});
+    }
+    void status(){try{File dir=owner.getExternalFilesDir(null);if(dir==null)return;String playing="false",looping="false",nativeLooping="false";int position=0,duration=0;try{if(player!=null&&videoReady){playing=String.valueOf(player.isPlaying());looping=String.valueOf(active&&!disposed);nativeLooping=String.valueOf(player.isLooping());position=player.getCurrentPosition();duration=player.getDuration();}}catch(Exception ignored){}try(Writer out=new FileWriter(new File(dir,"wallpaper-status.txt"))){out.write("kind="+kind()+"\nactive="+active+"\nphoto_motion="+(motion!=null&&motion.isRunning())+"\nvideo_playing="+playing+"\nvideo_looping="+looping+"\nvideo_native_looping="+nativeLooping+"\nvideo_loop_mode=manual\nvideo_loops="+videoLoops+"\nvideo_end_fallbacks="+videoEndFallbacks+"\nvideo_frames="+videoFrames+"\nvideo_position="+position+"\nvideo_duration="+duration+"\nvideo_muted=true\nvideo_failed="+videoFailed+"\nbitmap="+(cached==null?"none":cached.getWidth()+"x"+cached.getHeight())+"\n");}}catch(Exception ignored){}}
     private static final class Scrim extends View {private final Paint p=new Paint(3);Scrim(Activity a){super(a);}protected void onDraw(Canvas c){float w=getWidth(),h=getHeight();p.setShader(new LinearGradient(0,0,0,h,new int[]{0x30040b13,0x20040b13,0x80040b13,0xe6040b13},new float[]{0,.2f,.52f,1},Shader.TileMode.CLAMP));c.drawRect(0,0,w,h,p);p.setShader(null);}}
     private static final class PhotoView extends View {
         private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);private Bitmap bitmap;private float progress=-1;

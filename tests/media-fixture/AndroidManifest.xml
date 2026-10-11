@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.quiettv.mediafixture" android:versionCode="1" android:versionName="1">
+    <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="23" />
+    <application android:label="QuietTV 媒体测试源" android:allowBackup="false">
+        <activity android:name=".FixtureActivity" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LEANBACK_LAUNCHER" /></intent-filter>
+        </activity>
+    </application>
+    <instrumentation android:name=".FixtureInstrumentation" android:targetPackage="local.quiettv.mediafixture" android:label="Silent media metadata check" />
+</manifest>

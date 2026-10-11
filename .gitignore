@@ -5,12 +5,24 @@
 !/README.md
 !/CHANGELOG.md
 !/BACKGROUND-ASSETS.md
+!/LICENSE
+!/THIRD_PARTY_NOTICES.md
+!/PRIVACY.md
+!/SECURITY.md
+!/CONTRIBUTING.md
+!/AGENTS.md
+!/build.sh
+!/.github/
 !/AndroidManifest.xml
 !/build.ps1
 !/install-preview.ps1
 !/Restore-System-Home.ps1
 !/src/
 !/res/
+!/tests/
+!/tools/
+!/docs/
+# Music client modifications stay in the private review archive.
 
 # Private signing material and generated output must never be committed.
 **/*.jks
@@ -32,3 +44,6 @@
 **/.vscode/
 **/Thumbs.db
 **/.DS_Store
+**/__pycache__/
+**/*-local.*
+**/*-local-*/
