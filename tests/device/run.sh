@@ -24,7 +24,11 @@ export ADB_VENDOR_KEYS="$ANDROID_USER_HOME/adbkey"
 "$adb_bin" start-server
 avd_path="$ANDROID_AVD_HOME/$avd_name.avd"
 mkdir -p "$ANDROID_AVD_HOME"
-echo no | "$sdk_root/cmdline-tools/latest/bin/avdmanager" create avd --force --name "$avd_name" --package "$image" --path "$avd_path" --device tv_1080p
+profile=tv_1080p
+# The API 23 image's old DMA driver panics allocating a 1080p RGBA buffer
+# (8294400 bytes). Use the official smaller TV profile for this runtime.
+if [[ "$image" == 'system-images;android-23;android-tv;x86' ]]; then profile=tv_720p; fi
+echo no | "$sdk_root/cmdline-tools/latest/bin/avdmanager" create avd --force --name "$avd_name" --package "$image" --path "$avd_path" --device "$profile"
 # SDK/runner versions can disagree on the default AVD index directory.
 [[ -f "$avd_path/config.ini" ]] || { echo 'AVD creation failed' >&2; exit 1; }
 printf 'avd.ini.encoding=UTF-8\npath=%s\n' "$avd_path" > "$ANDROID_AVD_HOME/$avd_name.ini"

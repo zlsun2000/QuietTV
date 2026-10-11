@@ -16,7 +16,7 @@
 
 已观察到部分 Google Android TV 镜像原厂 HOME 具有更高优先级：`set-home-activity` 返回成功，实际解析仍可能是原厂。CI 单独记录 HOME 组件和未执行/受限项目，不能把这些当作接管成功；公开版保留原桌面，不为接管而停用它。
 
-CI 保留 API 23/28/30 的电视镜像。API 23/30 使用 [Google 官方存档](https://developer.android.com/studio/emulator_archive) 的 35.2.10 模拟器并核对官方 SHA-256，API 28 使用 SDK 安装的版本。37.2.12 在旧镜像上出现过启动前 DMA 崩溃或 ADB 离线，这些属于测试环境失败，不能记作桌面通过。界面含持续背景动画，设备检查等待窗口创建及实际绘制帧，不依赖全局消息队列空闲。各次结果以 CI 日志为准，模拟器工具不进入 APK。
+CI 保留 API 23/28/30 的电视镜像：Android 6 使用官方 720p 电视配置，9/11 使用 1080p。API 23/30 使用 [Google 官方存档](https://developer.android.com/studio/emulator_archive) 的 35.2.10 模拟器并核对官方 SHA-256，API 28 使用 SDK 安装的版本。旧 Android 6 镜像在申请 1080p RGBA 帧的 8294400 字节 DMA 缓冲区时崩溃；API 30 还出现过首次启动 ADB 离线。这些属于测试环境失败，不能记作桌面通过。界面含持续背景动画，设备检查等待窗口创建及实际绘制帧，不依赖全局消息队列空闲。各次结果以 CI 日志为准，模拟器工具不进入 APK。
 
 ## 继续播放
 
