@@ -17,12 +17,6 @@ public final class CheckDocuments extends ContentProvider {
     @Override public ParcelFileDescriptor openFile(Uri uri,String mode)throws FileNotFoundException{
         boolean virtual=Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator");
         if(!virtual)throw new FileNotFoundException("Only a synthetic emulator may use test documents");
-        if("/capture".equals(uri.getPath())){
-            File capture=new File(getContext().getCacheDir(),"ci-fresh.png");
-            if("w".equals(mode))return ParcelFileDescriptor.open(capture,ParcelFileDescriptor.MODE_WRITE_ONLY|ParcelFileDescriptor.MODE_CREATE|ParcelFileDescriptor.MODE_TRUNCATE);
-            if("r".equals(mode))return ParcelFileDescriptor.open(capture,ParcelFileDescriptor.MODE_READ_ONLY);
-            throw new FileNotFoundException("Unsupported capture mode");
-        }
         if(!"/image".equals(uri.getPath())||!"r".equals(mode))throw new FileNotFoundException("Unknown test document");
         File f=new File(getContext().getCacheDir(),"synthetic.png");
         try{Bitmap image=Bitmap.createBitmap(32,32,Bitmap.Config.ARGB_8888);image.eraseColor(0xff285a46);try(OutputStream out=new FileOutputStream(f)){image.compress(Bitmap.CompressFormat.PNG,100,out);}image.recycle();}catch(IOException e){throw new FileNotFoundException("Synthetic document creation failed");}

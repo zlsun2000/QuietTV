@@ -34,6 +34,11 @@ echo no | "$sdk_root/cmdline-tools/latest/bin/avdmanager" create avd --force --n
 printf 'avd.ini.encoding=UTF-8\npath=%s\n' "$avd_path" > "$ANDROID_AVD_HOME/$avd_name.ini"
 graphics=(-gpu swiftshader_indirect)
 if [[ "$image" != 'system-images;android-28;android-tv;x86' ]]; then graphics+=(-feature -Vulkan); fi
+if [[ "$image" == 'system-images;android-23;android-tv;x86' ]]; then
+  # This kernel's goldfish DMA allocator also panics at 720p. Use the
+  # emulator's non-DMA color-buffer transport without changing the guest OS.
+  graphics+=(-feature -GLDMA)
+fi
 "$emulator_bin" -avd "$avd_name" -port 5556 -no-window -no-audio -no-boot-anim -no-snapshot "${graphics[@]}" -no-metrics -show-kernel -wipe-data > "$project_root/build/ci-artifacts/emulator.log" 2>&1 &
 emulator_pid=$!
 cleanup() {
@@ -107,7 +112,18 @@ for phase in fresh upgrade; do
   timeout 120s "$adb_bin" -s "$serial" shell am instrument -w -e phase "$phase" local.quiettv.checks/local.quiettv.launcher.DeviceChecks | tee "$project_root/build/ci-artifacts/$phase.txt"
   grep -q "INSTRUMENTATION_RESULT: passed=$phase:" "$project_root/build/ci-artifacts/$phase.txt"
 done
-adb_device exec-out content read --uri content://local.quiettv.checks.documents/capture > "$project_root/build/ci-artifacts/ci-fresh.png"
+# Instrumentation finishes its Activity. Reopen it explicitly for a private
+# display capture; do not connect UiAutomation's unnecessary accessibility
+# service or read app-private external storage through the API 30 shell.
+adb_device shell am start -W -n local.quiettv.launcher/.MainActivity
+foreground=0
+for _ in $(seq 1 20); do
+  adb_device shell dumpsys window windows > "$project_root/build/ci-artifacts/capture-window.txt"
+  if grep -Eq 'mCurrentFocus=.*local\.quiettv\.launcher/' "$project_root/build/ci-artifacts/capture-window.txt"; then foreground=1; break; fi
+  sleep 1
+done
+[[ "$foreground" == 1 ]] || { echo 'Launcher did not own the capture window' >&2; exit 1; }
+adb_device exec-out screencap -p > "$project_root/build/ci-artifacts/ci-fresh.png"
 python3 - "$project_root/build/ci-artifacts/ci-fresh.png" <<'PY'
 import pathlib,sys
 capture=pathlib.Path(sys.argv[1]).read_bytes()
