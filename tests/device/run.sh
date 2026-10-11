@@ -116,20 +116,23 @@ if [[ "${QUIETTV_DOCUMENTATION_CAPTURE:-0}" == 1 ]]; then
   [[ "$image" == 'system-images;android-28;android-tv;x86' ]] || { echo 'Documentation capture requires the isolated API 28 image' >&2; exit 1; }
   # Only the disposable guest receives this synthetic, offline desktop setup.
   # Keep the released UI and builtin background, with no accounts or history.
-  adb_device shell pm list packages > "$out_dir/documentation-packages.txt"
-  python3 - "$out_dir/documentation-packages.txt" "$out_dir/documentation-state.json" <<'PY'
-import json,pathlib,sys
-packages={line.strip().removeprefix('package:') for line in pathlib.Path(sys.argv[1]).read_text().splitlines()}
-favorites=sorted(packages & {'com.android.development','com.google.android.videos','com.android.tv.settings'})
+  adb_device shell cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER > "$out_dir/documentation-tv-apps.txt"
+  adb_device shell cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER > "$out_dir/documentation-apps.txt"
+  python3 - "$out_dir/documentation-tv-apps.txt" "$out_dir/documentation-apps.txt" "$out_dir/documentation-state.json" <<'PY'
+import json,pathlib,re,sys
+components='\n'.join(pathlib.Path(path).read_text() for path in sys.argv[1:3])
+packages=sorted(set(re.findall(r'^\s*([A-Za-z0-9_.]+)/[A-Za-z0-9_.$]+\s*$',components,re.M)) - {'local.quiettv.launcher'})
+favorites=packages[:5]
 if not favorites:raise SystemExit('No documentation applications available')
+print('Documentation setup uses %d installed, launchable applications' % len(packages))
 def value(kind,data):return {'type':kind,'value':data}
 state={'home':{'config_schema':value('int',1),'setup_seen':value('boolean',True),
     'wallpaper_kind':value('string','builtin'),'favorites_initialized':value('boolean',True),
-    'favorites':value('set',favorites),'hidden':value('set',sorted(packages-set(favorites))),
+    'favorites':value('set',favorites),'hidden':value('set',[]),
     'groups':value('string',json.dumps([{'id':'favorites','title':'常用应用','row':True},{'id':'all','title':'全部应用','row':False}],ensure_ascii=False))},
     'playback_history':{'config_schema':value('int',1),'enabled':value('boolean',False),
         'generic_enabled':value('boolean',False),'music_enabled':value('boolean',False),'records':value('string','[]')},'weather':{}}
-pathlib.Path(sys.argv[2]).write_text(json.dumps(state,ensure_ascii=False),encoding='utf-8')
+pathlib.Path(sys.argv[3]).write_text(json.dumps(state,ensure_ascii=False),encoding='utf-8')
 PY
   adb_device shell am broadcast -a local.quiettv.launcher.EXPORT_STATE -n local.quiettv.launcher/.LocalMaintenanceReceiver
   adb_device push "$out_dir/documentation-state.json" /sdcard/Android/data/local.quiettv.launcher/files/quiettv-state-backup.json
