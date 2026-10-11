@@ -36,12 +36,13 @@ public final class DeviceChecks extends Instrumentation {
             weatherPrefs.edit().putString("consent","manual").commit();
             check(!weather.enabled(),"manual choice requires current service terms");
             weather.consent("manual");check(weather.enabled()&&weather.consented(),"current manual consent enables optional weather");
+            weather.start();check(!weather.loading(),"service consent alone never forecasts a city the user has not selected");
             weather.dispose();weatherPrefs.edit().clear().commit();
             check(!GenericMediaHistory.permission(c),"basic desktop requires no media grant");
             final boolean[] screen={false};runOnMainSync(()->{View root=activity.getWindow().getDecorView();screen[0]=root.getWidth()>0&&root.getHeight()>0&&activity.getCurrentFocus()!=null;});check(screen[0],"launcher lays out with a remote focus target");
             for(int key:new int[]{KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.KEYCODE_DPAD_UP})sendKeyDownUpSync(key);
             waitForIdleSync();final boolean[] focus={false};runOnMainSync(()->{View v=activity.getCurrentFocus();Rect visible=new Rect();focus[0]=v!=null&&v.getGlobalVisibleRect(visible)&&visible.width()>0&&visible.height()>0;});check(focus[0],"remote traversal retains visible focus");
-            if(Build.VERSION.SDK_INT>=24)check(SystemEntrypoints.defaultHome(c),"system resolves QuietTV as selected HOME");
+            if(Build.VERSION.SDK_INT>=24){android.content.pm.ResolveInfo resolved=c.getPackageManager().resolveActivity(SystemEntrypoints.homeQuery(),android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);String actual=resolved==null||resolved.activityInfo==null?"none":resolved.activityInfo.packageName+"/"+resolved.activityInfo.name;check(SystemEntrypoints.defaultHome(c),"system resolves QuietTV as selected HOME; actual="+actual);}
             WeatherRepository.Place place=new WeatherRepository.Place();place.name="Synthetic city";place.latitude=22.3;place.longitude=114.2;
             check(WeatherRepository.valid(place)&&!WeatherRepository.finite(Double.NaN),"weather validation works on the minimum Android runtime");
             check(MediaRecordPolicy.position(1000,10000,true,1f,1000,2000)==2000,"progress extrapolation uses compatible number validation");

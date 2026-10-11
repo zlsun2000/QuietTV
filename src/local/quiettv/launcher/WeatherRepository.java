@@ -39,7 +39,7 @@ final class WeatherRepository {
     private long retryAt;
     private String message="正在获取天气…";
     private final Runnable timer=new Runnable(){public void run(){refresh(false);}};
-    WeatherRepository(Context c,Changed callback){prefs=c.getSharedPreferences("weather",Context.MODE_PRIVATE);changed=callback;try{data=read(new JSONObject(prefs.getString("cache","{}")));}catch(Exception ignored){}if(data==null)message="天气待更新";}
+    WeatherRepository(Context c,Changed callback){prefs=c.getSharedPreferences("weather",Context.MODE_PRIVATE);changed=callback;if(!prefs.getString("place","").isEmpty())try{data=read(new JSONObject(prefs.getString("cache","{}")));}catch(Exception ignored){}if(data==null)message="天气待更新";}
     Data data(){return data;}
     boolean loading(){return busy;}
     String message(){return message;}
@@ -53,18 +53,17 @@ final class WeatherRepository {
     void select(Place p){if(!valid(p))return;try{generation++;busy=false;data=null;retryAt=0;prefs.edit().putString("place",p.json().toString()).remove("cache").apply();message="正在获取"+p.name+"天气…";changed.changed();refresh(true);}catch(Exception ignored){}}
     void refresh(boolean force){
         if(disposed||!active||!enabled()||busy)return;
+        if(prefs.getString("place","").isEmpty()){message="点击选择天气城市";changed.changed();return;}
         long now=System.currentTimeMillis();main.removeCallbacks(timer);
         if(!force&&data!=null&&now>=data.updated&&now-data.updated<FRESH_MS){main.postDelayed(timer,FRESH_MS-(now-data.updated));return;}
         if(!force&&now<retryAt){main.postDelayed(timer,retryAt-now);return;}
         final int request=generation;busy=true;message="正在更新天气…";changed.changed();
         final String manualPlace=prefs.getString("place","");
-        final Data previous=data;
         worker.execute(new Runnable(){public void run(){
             Data result=null;
             try {
                 Place p=manualPlace.isEmpty()?null:Place.read(new JSONObject(manualPlace));
                 boolean manual=p!=null;
-                if(p==null&&previous!=null&&System.currentTimeMillis()-previous.updated<24*60*60*1000L)p=previous.place;
                 if(!valid(p))throw new java.io.IOException("Location unavailable");
                 result=forecast(p,manual);
             } catch(Exception ignored){}

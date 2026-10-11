@@ -28,17 +28,22 @@ for _ in $(seq 1 120); do
   sleep 2
 done
 [[ "$booted" == 1 ]] || { echo 'Emulator failed to boot' >&2; exit 1; }
+# Provision only the disposable emulator so its first-use wizard does not own HOME.
+"$adb_bin" -s "$serial" shell settings put global device_provisioned 1
+"$adb_bin" -s "$serial" shell settings put secure user_setup_complete 1
+"$adb_bin" -s "$serial" shell settings put secure tv_user_setup_complete 1
 "$adb_bin" -s "$serial" shell input keyevent 82
 "$adb_bin" -s "$serial" install -r "$project_root/QuietTV.apk"
 # Android 6 has no set-home-activity shell command; test opening its launcher explicitly.
 if [[ "$image" != 'system-images;android-23;android-tv;x86' ]]; then
   "$adb_bin" -s "$serial" shell cmd package set-home-activity --user 0 local.quiettv.launcher/.MainActivity
+  "$adb_bin" -s "$serial" shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME
 fi
 android_jar="$sdk_root/platforms/android-28/android.jar"
 "$build_tools/aapt" package -f -M "$project_root/tests/device/AndroidManifest.xml" -I "$android_jar" -J "$out_dir/gen" -F "$out_dir/resources.apk"
 find "$project_root/tests/device/src" -name '*.java' -print0 | xargs -0 javac --release 8 -encoding UTF-8 -classpath "$project_root/build/classes:$android_jar" -d "$out_dir/classes"
 jar cf "$out_dir/classes.jar" -C "$out_dir/classes" .
-java -cp "$build_tools/lib/d8.jar" com.android.tools.r8.D8 --lib "$android_jar" --min-api 23 --output "$out_dir/dex" "$out_dir/classes.jar"
+java -cp "$build_tools/lib/d8.jar" com.android.tools.r8.D8 --lib "$android_jar" --classpath "$project_root/build/classes.jar" --min-api 23 --output "$out_dir/dex" "$out_dir/classes.jar"
 cp "$out_dir/resources.apk" "$out_dir/unsigned.apk"
 jar uf "$out_dir/unsigned.apk" -C "$out_dir/dex" classes.dex
 "$build_tools/zipalign" -f 4 "$out_dir/unsigned.apk" "$out_dir/aligned.apk"
