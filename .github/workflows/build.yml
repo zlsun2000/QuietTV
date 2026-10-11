@@ -35,6 +35,8 @@ jobs:
           sudo chmod 666 /dev/kvm
       - name: Clean build and core checks
         run: bash build.sh
+      - name: Public source, history and APK review gate
+        run: python3 tools/check-release.py --apk QuietTV.apk
       - name: Fresh install, remote navigation, document import and upgrade
         run: bash tests/device/run.sh
       - name: Preserve emulator evidence

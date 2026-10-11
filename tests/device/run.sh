@@ -12,6 +12,9 @@ avd_name="quiettv-ci-$(echo "$image" | tr -cd '0-9')"
 out_dir="$project_root/build/device-checks"
 mkdir -p "$out_dir/gen" "$out_dir/classes" "$out_dir/dex" "$project_root/build/ci-artifacts"
 export ANDROID_AVD_HOME="$out_dir/avd"
+export ADB_VENDOR_KEYS="$out_dir/adbkey"
+"$adb_bin" keygen "$ADB_VENDOR_KEYS"
+"$adb_bin" start-server
 avd_path="$ANDROID_AVD_HOME/$avd_name.avd"
 mkdir -p "$ANDROID_AVD_HOME"
 echo no | "$sdk_root/cmdline-tools/latest/bin/avdmanager" create avd --force --name "$avd_name" --package "$image" --path "$avd_path"
@@ -59,4 +62,9 @@ for phase in fresh upgrade; do
 done
 "$adb_bin" -s "$serial" pull /sdcard/Android/data/local.quiettv.launcher/files/ci-fresh.png "$project_root/build/ci-artifacts/ci-fresh.png"
 "$adb_bin" -s "$serial" logcat -d -s AndroidRuntime:E > "$project_root/build/ci-artifacts/crashes.txt"
-[[ ! -s "$project_root/build/ci-artifacts/crashes.txt" || -z "$(grep 'FATAL EXCEPTION' "$project_root/build/ci-artifacts/crashes.txt" || true)" ]]
+# Some stock images crash their own Live Channels app before our install.
+# Preserve those logs, but fail for a launcher or test-provider process crash.
+if grep -Eq 'Process: local\.quiettv\.(launcher|checks)(:|,)' "$project_root/build/ci-artifacts/crashes.txt"; then
+  echo 'QuietTV process crashed' >&2
+  exit 1
+fi

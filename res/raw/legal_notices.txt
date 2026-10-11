@@ -1,0 +1,43 @@
+MIT License
+
+Copyright (c) 2026 zlsun2000 and QuietTV contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+QuietTV 0.12.0 - bundled rights and external services
+
+Project-owned code and resources: MIT, to the extent rights can be licensed.
+The AI-generated nature image has no reference image; exclusivity and copyright
+status in every jurisdiction are not guaranteed. See BACKGROUND-ASSETS.md.
+
+Weather data: Open-Meteo.com, CC BY 4.0. Temperature rounded; conditions translated.
+https://open-meteo.com/en/licence
+City data: GeoNames, via Open-Meteo geocoding, CC BY 4.0.
+https://www.geonames.org/about.html
+https://creativecommons.org/licenses/by/4.0/
+Free API access is noncommercial only, independently of the MIT software license.
+https://open-meteo.com/en/terms
+
+Runtime application icons and media information belong to their respective owners
+and are not included in this APK or licensed by QuietTV. No affiliation or endorsement
+by TCL, Bilibili, iQIYI, Apple, Netflix, Disney, FLauncher or Emotn is claimed.
+No music client, account tool, DRM implementation or third-party media is bundled.
+
+Source, full notices and review:
+https://github.com/zlsun2000/QuietTV
