@@ -15,7 +15,8 @@ import java.util.concurrent.*;
 public final class DeviceChecks extends Instrumentation {
     private String phase;private int count;
     @Override public void onCreate(Bundle args){super.onCreate(args);phase=args==null?"":args.getString("phase","");start();}
-    private void check(boolean condition,String description){count++;if(!condition)throw new AssertionError(description);}
+    private void status(String description){Bundle progress=new Bundle();progress.putString("check",description);sendStatus(0,progress);}
+    private void check(boolean condition,String description){count++;if(!condition)throw new AssertionError(description);status(description);}
     private String resolvedHome(Context c){android.content.pm.ResolveInfo resolved=c.getPackageManager().resolveActivity(SystemEntrypoints.homeQuery(),android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);return resolved==null||resolved.activityInfo==null?"none":resolved.activityInfo.packageName+"/"+resolved.activityInfo.name;}
     private Object field(Object owner,String name)throws Exception{Field f=owner.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(owner);}
     @Override public void onStart(){Bundle result=new Bundle();try{
@@ -23,7 +24,9 @@ public final class DeviceChecks extends Instrumentation {
         boolean virtual=Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator");
         check(virtual,"only a synthetic emulator may run device checks");
         Context c=getTargetContext();SharedPreferences home=c.getSharedPreferences("home",0),history=c.getSharedPreferences("playback_history",0);
+        status("starting a new launcher Activity");
         MainActivity activity=(MainActivity)startActivitySync(new Intent().setComponent(new ComponentName(c,MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        status("launcher Activity created; waiting for idle");
         waitForIdleSync();Thread.sleep(1500);waitForIdleSync();
         runOnMainSync(()->{try{Dialog dialog=(Dialog)field(activity,"sheet");if(dialog!=null)dialog.dismiss();}catch(Exception e){throw new RuntimeException(e);}});
         if("fresh".equals(phase)){
@@ -45,7 +48,7 @@ public final class DeviceChecks extends Instrumentation {
             waitForIdleSync();final boolean[] focus={false};runOnMainSync(()->{View v=activity.getCurrentFocus();Rect visible=new Rect();focus[0]=v!=null&&v.getGlobalVisibleRect(visible)&&visible.width()>0&&visible.height()>0;});check(focus[0],"remote traversal retains visible focus");
             boolean registered=false;for(android.content.pm.ResolveInfo homeEntry:c.getPackageManager().queryIntentActivities(SystemEntrypoints.homeQuery(),0))if(homeEntry.activityInfo!=null&&c.getPackageName().equals(homeEntry.activityInfo.packageName)&&homeEntry.activityInfo.enabled&&homeEntry.activityInfo.exported)registered=true;
             check(registered,"installed launcher exposes an enabled HOME entry");
-            String actual=resolvedHome(c);getContext().getSharedPreferences("checks",0).edit().putString("home_before",actual).commit();result.putString("homeResolution",actual);
+            String actual=resolvedHome(c);home.edit().putString("ci_home_before",actual).commit();result.putString("homeResolution",actual);
             if(Build.VERSION.SDK_INT>=24){if(SystemEntrypoints.defaultHome(c))check(actual.startsWith(c.getPackageName()+"/"),"the operating system selected the new HOME");else{android.content.pm.ResolveInfo homeEntry=c.getPackageManager().resolveActivity(SystemEntrypoints.homeQuery(),android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);check(homeEntry!=null&&homeEntry.priority>0&&(actual.startsWith("com.google.android.tvlauncher/")||actual.startsWith("com.google.android.leanbacklauncher/")),"unselected HOME has a documented stock TV priority; actual="+actual);result.putString("skipped","Default HOME takeover blocked by stock priority; opening/navigation still tested");}}
             else result.putString("skipped","Android 6 has no set-home-activity shell command; default HOME selection not attempted");
             WeatherRepository.Place place=new WeatherRepository.Place();place.name="Synthetic city";place.latitude=22.3;place.longitude=114.2;
@@ -68,7 +71,9 @@ public final class DeviceChecks extends Instrumentation {
             check("theme".equals(home.getString("wallpaper_kind",""))&&home.getInt("theme",0)==2,"wallpaper selection survives upgrade");
             check(!history.getBoolean("enabled",true)&&history.getBoolean("generic_enabled",false)&&!history.getBoolean("music_enabled",true),"explicit legacy choices survive migration");
             check("[]".equals(history.getString("records","")),"record storage is retained");
-            String before=getContext().getSharedPreferences("checks",0).getString("home_before","none"),after=resolvedHome(c);result.putString("homeResolution",after);
+            check(home.contains("ci_home_before"),"HOME comparison baseline survives covering install");
+            String before=home.getString("ci_home_before","none"),after=resolvedHome(c);result.putString("homeResolution",after);
+            home.edit().remove("ci_home_before").commit();
             if(before.equals(after))check(true,"operating system HOME resolution survives covering install");else result.putString("skipped","Operating system changed HOME during upgrade: "+before+" -> "+after+"; launcher configuration checks passed separately");
         }else throw new AssertionError("Unknown phase");
         result.putString("passed",phase+": "+count+" device checks");finish(Activity.RESULT_OK,result);

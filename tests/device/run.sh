@@ -23,11 +23,24 @@ echo no | "$sdk_root/cmdline-tools/latest/bin/avdmanager" create avd --force --n
 # SDK/runner versions can disagree on the default AVD index directory.
 [[ -f "$avd_path/config.ini" ]] || { echo 'AVD creation failed' >&2; exit 1; }
 printf 'avd.ini.encoding=UTF-8\npath=%s\n' "$avd_path" > "$ANDROID_AVD_HOME/$avd_name.ini"
-"$sdk_root/emulator/emulator" -avd "$avd_name" -port 5556 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader -feature -Vulkan -no-metrics -show-kernel -wipe-data > "$project_root/build/ci-artifacts/emulator.log" 2>&1 &
+graphics=(-gpu swiftshader_indirect)
+if [[ "$image" == 'system-images;android-30;android-tv;x86' ]]; then
+  # API 30's guest disconnects during boot with the older graphics path.
+  graphics=(-gpu swiftshader -feature -Vulkan)
+fi
+"$sdk_root/emulator/emulator" -avd "$avd_name" -port 5556 -no-window -no-audio -no-boot-anim -no-snapshot "${graphics[@]}" -no-metrics -show-kernel -wipe-data > "$project_root/build/ci-artifacts/emulator.log" 2>&1 &
 emulator_pid=$!
-trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
+cleanup() {
+  result=$?
+  if [[ "$result" != 0 ]]; then
+    timeout 10s "$adb_bin" -s "$serial" logcat -d > "$project_root/build/ci-artifacts/failure-logcat.log" 2>&1 || true
+  fi
+  kill "$emulator_pid" 2>/dev/null || true
+}
+trap cleanup EXIT
 booted=0
-for _ in $(seq 1 120); do
+boot_deadline=$((SECONDS+240))
+while (( SECONDS < boot_deadline )); do
   kill -0 "$emulator_pid" 2>/dev/null || { tail -n 30 "$project_root/build/ci-artifacts/emulator.log"; exit 1; }
   if [[ "$(timeout 5s "$adb_bin" -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; then booted=1; break; fi
   sleep 2
@@ -36,9 +49,11 @@ done
 # boot_completed may precede the first stable settings/package service connection.
 ready=0
 readiness_log="$project_root/build/ci-artifacts/boot-readiness.log"
+attempt=0
 for _ in $(seq 1 30); do
+  attempt=$((attempt+1))
   state="$(timeout 5s "$adb_bin" -s "$serial" get-state 2>&1 || true)"
-  printf 'attempt=%s state=%s\n' "$_" "$state" >> "$readiness_log"
+  printf 'attempt=%s state=%s\n' "$attempt" "$state" >> "$readiness_log"
   if [[ "$state" != device ]]; then
     # API 30 reports boot_completed before adbd can reconnect after first boot.
     # Reconnect only this disposable guest, never other attached devices.
@@ -72,8 +87,10 @@ if [[ "$image" != 'system-images;android-23;android-tv;x86' ]]; then
   adb_device shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME
 fi
 for phase in fresh upgrade; do
+  # startActivitySync must create an Activity, not reuse a previously opened
+  # singleTask HOME instance created while the default HOME was being selected.
+  adb_device shell am force-stop local.quiettv.launcher
   if [[ "$phase" == upgrade ]]; then
-    adb_device shell am force-stop local.quiettv.launcher
     adb_device install -r "$project_root/QuietTV.apk"
   fi
   timeout 120s "$adb_bin" -s "$serial" shell am instrument -w -e phase "$phase" local.quiettv.checks/local.quiettv.launcher.DeviceChecks | tee "$project_root/build/ci-artifacts/$phase.txt"
