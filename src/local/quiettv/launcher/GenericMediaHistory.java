@@ -44,6 +44,6 @@ final class GenericMediaHistory {
         if(controller!=null)new Handler(Looper.getMainLooper()).postDelayed(new Runnable(){public void run(){MediaController live=current(c,r);if(live!=null&&live.getPlaybackState().getState()==PlaybackState.STATE_PAUSED)try{live.getTransportControls().play();}catch(Exception ignored){}}},350);
     }
     static void changed(Context c){c.sendBroadcast(new Intent(HistoryStore.CHANGED).setPackage(c.getPackageName()));}
-    static void rebind(Context c){if(permission(c))try{android.service.notification.NotificationListenerService.requestRebind(listener(c));}catch(Exception ignored){}}
+    static void rebind(Context c){if(Build.VERSION.SDK_INT>=24&&permission(c))try{android.service.notification.NotificationListenerService.requestRebind(listener(c));}catch(Exception ignored){}}
     private GenericMediaHistory(){}
 }

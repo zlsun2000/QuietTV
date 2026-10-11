@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [28, 30]
+        api: [23, 28, 30]
     env:
       QUIETTV_KEYSTORE_PASSWORD: quiettv-ci-ephemeral-password
       QUIETTV_RUN_CHECKS: '1'

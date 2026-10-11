@@ -5,7 +5,7 @@ project_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 sdk_root="${ANDROID_HOME:?}"
 build_tools="${QUIETTV_BUILD_TOOLS:?}"
 image="${QUIETTV_EMULATOR_IMAGE:?}"
-case "$image" in 'system-images;android-28;android-tv;x86'|'system-images;android-30;android-tv;x86') ;; *) echo 'Unsupported test image' >&2; exit 1 ;; esac
+case "$image" in 'system-images;android-23;android-tv;x86'|'system-images;android-28;android-tv;x86'|'system-images;android-30;android-tv;x86') ;; *) echo 'Unsupported test image' >&2; exit 1 ;; esac
 adb_bin="$sdk_root/platform-tools/adb"
 serial='emulator-5556'
 avd_name="quiettv-ci-$(echo "$image" | tr -cd '0-9')"
@@ -24,7 +24,10 @@ done
 [[ "$booted" == 1 ]] || { echo 'Emulator failed to boot' >&2; exit 1; }
 "$adb_bin" -s "$serial" shell input keyevent 82
 "$adb_bin" -s "$serial" install -r "$project_root/QuietTV.apk"
-"$adb_bin" -s "$serial" shell cmd package set-home-activity --user 0 local.quiettv.launcher/.MainActivity
+# Android 6 has no set-home-activity shell command; test opening its launcher explicitly.
+if [[ "$image" != 'system-images;android-23;android-tv;x86' ]]; then
+  "$adb_bin" -s "$serial" shell cmd package set-home-activity --user 0 local.quiettv.launcher/.MainActivity
+fi
 android_jar="$sdk_root/platforms/android-28/android.jar"
 "$build_tools/aapt" package -f -M "$project_root/tests/device/AndroidManifest.xml" -I "$android_jar" -J "$out_dir/gen" -F "$out_dir/resources.apk"
 find "$project_root/tests/device/src" -name '*.java' -print0 | xargs -0 javac --release 8 -encoding UTF-8 -classpath "$project_root/build/classes:$android_jar" -d "$out_dir/classes"

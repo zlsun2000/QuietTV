@@ -16,7 +16,7 @@ final class MediaRecordPolicy {
     static String digest(String raw){try{byte[] data=MessageDigest.getInstance("SHA-256").digest(raw.getBytes("UTF-8"));StringBuilder s=new StringBuilder();for(byte b:data)s.append(String.format(Locale.US,"%02x",b&255));return s.toString();}catch(Exception e){throw new IllegalStateException(e);}}
     static long position(long base,long duration,boolean playing,float speed,long lastUpdate,long now){
         long result=Math.max(0,Math.min(base,259200000L));
-        if(base>=0&&playing&&lastUpdate>0&&now>=lastUpdate&&Float.isFinite(speed)&&speed>0&&speed<=16){double value=result+Math.min(now-lastUpdate,259200000L)*(double)speed;result=(long)Math.min(value,259200000L);}
+        if(base>=0&&playing&&lastUpdate>0&&now>=lastUpdate&&!Float.isNaN(speed)&&!Float.isInfinite(speed)&&speed>0&&speed<=16){double value=result+Math.min(now-lastUpdate,259200000L)*(double)speed;result=(long)Math.min(value,259200000L);}
         return duration>0?Math.min(result,duration):result;
     }
     static boolean suppressed(long started,long updated,long removed,long cleared){return updated<=cleared||removed>=updated||(started>0&&(started<=removed||started<=cleared));}

@@ -41,7 +41,10 @@ public final class DeviceChecks extends Instrumentation {
             final boolean[] screen={false};runOnMainSync(()->{View root=activity.getWindow().getDecorView();screen[0]=root.getWidth()>0&&root.getHeight()>0&&activity.getCurrentFocus()!=null;});check(screen[0],"launcher lays out with a remote focus target");
             for(int key:new int[]{KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.KEYCODE_DPAD_UP})sendKeyDownUpSync(key);
             waitForIdleSync();final boolean[] focus={false};runOnMainSync(()->{View v=activity.getCurrentFocus();Rect visible=new Rect();focus[0]=v!=null&&v.getGlobalVisibleRect(visible)&&visible.width()>0&&visible.height()>0;});check(focus[0],"remote traversal retains visible focus");
-            check(SystemEntrypoints.defaultHome(c),"system resolves QuietTV as selected HOME");
+            if(Build.VERSION.SDK_INT>=24)check(SystemEntrypoints.defaultHome(c),"system resolves QuietTV as selected HOME");
+            WeatherRepository.Place place=new WeatherRepository.Place();place.name="Synthetic city";place.latitude=22.3;place.longitude=114.2;
+            check(WeatherRepository.valid(place)&&!WeatherRepository.finite(Double.NaN),"weather validation works on the minimum Android runtime");
+            check(MediaRecordPolicy.position(1000,10000,true,1f,1000,2000)==2000,"progress extrapolation uses compatible number validation");
             CountDownLatch latch=new CountDownLatch(1);boolean[] imported={false};Wallpapers wallpapers=(Wallpapers)field(activity,"wallpapers");
             wallpapers.importDocument(Uri.parse("content://local.quiettv.checks.documents/image"),(ok,video)->{imported[0]=ok&&!video;latch.countDown();});
             check(latch.await(10,TimeUnit.SECONDS)&&imported[0],"selected provider document imports without broad storage permission");
@@ -59,7 +62,7 @@ public final class DeviceChecks extends Instrumentation {
             check("theme".equals(home.getString("wallpaper_kind",""))&&home.getInt("theme",0)==2,"wallpaper selection survives upgrade");
             check(!history.getBoolean("enabled",true)&&history.getBoolean("generic_enabled",false)&&!history.getBoolean("music_enabled",true),"explicit legacy choices survive migration");
             check("[]".equals(history.getString("records","")),"record storage is retained");
-            check(SystemEntrypoints.defaultHome(c),"HOME preference survives covering install");
+            if(Build.VERSION.SDK_INT>=24)check(SystemEntrypoints.defaultHome(c),"HOME preference survives covering install");
         }else throw new AssertionError("Unknown phase");
         result.putString("passed",phase+": "+count+" device checks");finish(Activity.RESULT_OK,result);
     }catch(Throwable e){result.putString("failed",e.getClass().getSimpleName()+": "+e.getMessage());finish(Activity.RESULT_CANCELED,result);}}
