@@ -39,6 +39,7 @@ public final class DeviceChecks extends Instrumentation {
         MainActivity activity=(MainActivity)opened;
         awaitFrames(activity);Thread.sleep(1500);awaitFrames(activity);
         runOnMainSync(()->{try{Dialog dialog=(Dialog)field(activity,"sheet");if(dialog!=null)dialog.dismiss();}catch(Exception e){throw new RuntimeException(e);}});
+        awaitFrames(activity);
         if("fresh".equals(phase)){
             check(home.getInt("config_schema",0)==1,"fresh HOME preferences initialize");
             check(!history.getBoolean("enabled",true)&&!history.getBoolean("generic_enabled",true)&&!history.getBoolean("music_enabled",true),"fresh playback integrations are opt-in");
@@ -53,9 +54,9 @@ public final class DeviceChecks extends Instrumentation {
             weather.start();check(!weather.loading(),"service consent alone never forecasts a city the user has not selected");
             weather.dispose();weatherPrefs.edit().clear().commit();
             check(!GenericMediaHistory.permission(c),"basic desktop requires no media grant");
-            final boolean[] screen={false};runOnMainSync(()->{View root=activity.getWindow().getDecorView();screen[0]=root.getWidth()>0&&root.getHeight()>0&&activity.getCurrentFocus()!=null;});check(screen[0],"launcher lays out with a remote focus target");
+            final boolean[] screen={false};runOnMainSync(()->{View root=activity.getWindow().getDecorView();screen[0]=root.getWidth()>0&&root.getHeight()>0&&root.hasWindowFocus()&&activity.getCurrentFocus()!=null;});check(screen[0],"launcher is the foreground window with a remote focus target");
             for(int key:new int[]{KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.KEYCODE_DPAD_UP})sendKeyDownUpSync(key);
-            awaitFrames(activity);final boolean[] focus={false};runOnMainSync(()->{View v=activity.getCurrentFocus();Rect visible=new Rect();focus[0]=v!=null&&v.getGlobalVisibleRect(visible)&&visible.width()>0&&visible.height()>0;});check(focus[0],"remote traversal retains visible focus");
+            awaitFrames(activity);final boolean[] focus={false};runOnMainSync(()->{View v=activity.getCurrentFocus();Rect visible=new Rect();focus[0]=activity.getWindow().getDecorView().hasWindowFocus()&&v!=null&&v.getGlobalVisibleRect(visible)&&visible.width()>0&&visible.height()>0;});check(focus[0],"remote traversal retains visible foreground focus");
             boolean registered=false;for(android.content.pm.ResolveInfo homeEntry:c.getPackageManager().queryIntentActivities(SystemEntrypoints.homeQuery(),0))if(homeEntry.activityInfo!=null&&c.getPackageName().equals(homeEntry.activityInfo.packageName)&&homeEntry.activityInfo.enabled&&homeEntry.activityInfo.exported)registered=true;
             check(registered,"installed launcher exposes an enabled HOME entry");
             String actual=resolvedHome(c);home.edit().putString("ci_home_before",actual).commit();result.putString("homeResolution",actual);
