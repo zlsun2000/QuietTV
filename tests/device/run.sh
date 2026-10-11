@@ -107,7 +107,14 @@ for phase in fresh upgrade; do
   timeout 120s "$adb_bin" -s "$serial" shell am instrument -w -e phase "$phase" local.quiettv.checks/local.quiettv.launcher.DeviceChecks | tee "$project_root/build/ci-artifacts/$phase.txt"
   grep -q "INSTRUMENTATION_RESULT: passed=$phase:" "$project_root/build/ci-artifacts/$phase.txt"
 done
-adb_device pull /sdcard/Android/data/local.quiettv.launcher/files/ci-fresh.png "$project_root/build/ci-artifacts/ci-fresh.png"
+adb_device exec-out content read --uri content://local.quiettv.checks.documents/capture > "$project_root/build/ci-artifacts/ci-fresh.png"
+python3 - "$project_root/build/ci-artifacts/ci-fresh.png" <<'PY'
+import pathlib,sys
+capture=pathlib.Path(sys.argv[1]).read_bytes()
+if not capture.startswith(b'\x89PNG\r\n\x1a\n') or len(capture)<100:
+    raise SystemExit('Emulator capture export is not a valid PNG')
+print('Private emulator PNG verified; public CI artifacts contain logs only.')
+PY
 adb_device logcat -d -s AndroidRuntime:E > "$project_root/build/ci-artifacts/crashes.txt"
 # Some stock images crash their own Live Channels app before our install.
 # Preserve those logs, but fail for a launcher or test-provider process crash.

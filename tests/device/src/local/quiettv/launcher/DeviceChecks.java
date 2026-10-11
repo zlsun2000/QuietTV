@@ -70,7 +70,10 @@ public final class DeviceChecks extends Instrumentation {
             File background=new File(home.getString("wallpaper_path",""));check(background.isFile()&&background.getName().matches("import-[0-9]+\\.png"),"unsafe provider display name cannot escape wallpaper library");
             check(background.getCanonicalPath().startsWith(wallpapers.library().getCanonicalPath()+File.separator),"import stays in the application library");
             home.edit().putString("wallpaper_kind","builtin").commit();runOnMainSync(()->activity.render());awaitFrames(activity);
-            Bitmap capture=getUiAutomation().takeScreenshot();if(capture!=null){File dir=c.getExternalFilesDir(null);if(dir!=null)try(OutputStream out=new FileOutputStream(new File(dir,"ci-fresh.png"))){capture.compress(Bitmap.CompressFormat.PNG,100,out);}capture.recycle();}
+            Bitmap capture=getUiAutomation().takeScreenshot();check(capture!=null,"display capture is available for private emulator review");
+            try(OutputStream out=c.getContentResolver().openOutputStream(Uri.parse("content://local.quiettv.checks.documents/capture"),"w")){
+                check(out!=null&&capture.compress(Bitmap.CompressFormat.PNG,100,out),"test provider exports the capture without shared-storage access");
+            }finally{capture.recycle();}
             // Simulate old-version preferences, then let the runner perform an actual install -r.
             home.edit().remove("config_schema").putStringSet("favorites",new HashSet<>(Arrays.asList("com.example.saved"))).putString("wallpaper_kind","theme").putInt("theme",2).putString("groups","[{\"id\":\"favorites\",\"title\":\"Saved category\",\"row\":true},{\"id\":\"all\",\"title\":\"Apps\",\"row\":false}]").commit();
             history.edit().remove("config_schema").putBoolean("enabled",false).putBoolean("generic_enabled",true).putBoolean("music_enabled",false).putString("records","[]").commit();
