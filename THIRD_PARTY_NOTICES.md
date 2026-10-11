@@ -10,7 +10,8 @@ APK 的 `res/raw/legal_notices.txt` 同时包含完整 MIT 版权/许可证及�
 | `res/raw/nature_lake.png` | 无参考图片的 AI 生成山湖图，提示词见 BACKGROUND-ASSETS.md | 项目允许按 MIT 使用其可许可权益；不保证 AI 图像独占性或在所有地区的著作权成立 |
 | 天气数据 | [Open-Meteo](https://open-meteo.com/en/licence) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)；界面署名并提供链接，温度取整、状态翻译；免费 API 须符合 [非商业访问条款](https://open-meteo.com/en/terms) |
 | 城市搜索数据 | Open-Meteo geocoding，基础城市库 [GeoNames](https://www.geonames.org/about.html) | CC BY 4.0；城市选择和天气详情保留来源与许可入口；不打包数据集 |
-| 运行时应用图标、媒体标题/封面 | 用户已安装应用通过 Android API 提供 | 不随 APK/源码分发；仅本地显示、有限缓存，不纳入 MIT。公开截图前另核对权利与隐私 |
+| 运行时应用图标、媒体标题/封面 | 用户已安装应用通过 Android API 提供 | 不打包为 APK/源码资源；仅本地显示、有限缓存，不纳入 MIT。文档截图中的图标按下一项处理 |
+| `docs/images/quiettv-home.png` | 公开版在隔离 Android TV 环境中的真实截图，来源见 [截图说明](docs/SCREENSHOTS.md) | 桌面与内置背景属于项目可许可内容；画面中的系统应用图标/名称属于各自权利人，不纳入 MIT，不表示合作或背书。无私人记录、账号或用户导入素材 |
 | FLauncher / Emotn UI | 交互/视觉参考 | 未纳入其源码、资源、截图或商标；这些项目不为静幕背书 |
 | B 站、奇异果、TCL、Netflix、Disney、Apple Music | 说明兼容性所用第三方名称或包标识 | 权利属于各自权利人，无官方合作或授权暗示。不发布其应用、账号工具、音乐/视频或 DRM 实现 |
 
