@@ -17,6 +17,13 @@ public final class DeviceChecks extends Instrumentation {
     @Override public void onCreate(Bundle args){super.onCreate(args);phase=args==null?"":args.getString("phase","");start();}
     private void status(String description){Bundle progress=new Bundle();progress.putString("check",description);sendStatus(0,progress);}
     private void check(boolean condition,String description){count++;if(!condition)throw new AssertionError(description);status(description);}
+    private void awaitFrames(Activity activity)throws InterruptedException{
+        // The default photo background animates indefinitely. Global queue-idle
+        // synchronization can therefore hang on API 30's software renderer.
+        CountDownLatch rendered=new CountDownLatch(1);
+        runOnMainSync(()->activity.getWindow().getDecorView().postOnAnimation(()->activity.getWindow().getDecorView().postOnAnimation(rendered::countDown)));
+        if(!rendered.await(10,TimeUnit.SECONDS))throw new AssertionError("launcher frame timeout");
+    }
     private String resolvedHome(Context c){android.content.pm.ResolveInfo resolved=c.getPackageManager().resolveActivity(SystemEntrypoints.homeQuery(),android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);return resolved==null||resolved.activityInfo==null?"none":resolved.activityInfo.packageName+"/"+resolved.activityInfo.name;}
     private Object field(Object owner,String name)throws Exception{Field f=owner.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(owner);}
     @Override public void onStart(){Bundle result=new Bundle();try{
@@ -25,9 +32,12 @@ public final class DeviceChecks extends Instrumentation {
         check(virtual,"only a synthetic emulator may run device checks");
         Context c=getTargetContext();SharedPreferences home=c.getSharedPreferences("home",0),history=c.getSharedPreferences("playback_history",0);
         status("starting a new launcher Activity");
-        MainActivity activity=(MainActivity)startActivitySync(new Intent().setComponent(new ComponentName(c,MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        status("launcher Activity created; waiting for idle");
-        waitForIdleSync();Thread.sleep(1500);waitForIdleSync();
+        ActivityMonitor monitor=addMonitor(MainActivity.class.getName(),null,false);
+        c.startActivity(new Intent().setComponent(new ComponentName(c,MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        Activity opened=waitForMonitorWithTimeout(monitor,10000);removeMonitor(monitor);
+        check(opened instanceof MainActivity,"launcher Activity created within timeout");
+        MainActivity activity=(MainActivity)opened;
+        awaitFrames(activity);Thread.sleep(1500);awaitFrames(activity);
         runOnMainSync(()->{try{Dialog dialog=(Dialog)field(activity,"sheet");if(dialog!=null)dialog.dismiss();}catch(Exception e){throw new RuntimeException(e);}});
         if("fresh".equals(phase)){
             check(home.getInt("config_schema",0)==1,"fresh HOME preferences initialize");
@@ -45,7 +55,7 @@ public final class DeviceChecks extends Instrumentation {
             check(!GenericMediaHistory.permission(c),"basic desktop requires no media grant");
             final boolean[] screen={false};runOnMainSync(()->{View root=activity.getWindow().getDecorView();screen[0]=root.getWidth()>0&&root.getHeight()>0&&activity.getCurrentFocus()!=null;});check(screen[0],"launcher lays out with a remote focus target");
             for(int key:new int[]{KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.KEYCODE_DPAD_UP})sendKeyDownUpSync(key);
-            waitForIdleSync();final boolean[] focus={false};runOnMainSync(()->{View v=activity.getCurrentFocus();Rect visible=new Rect();focus[0]=v!=null&&v.getGlobalVisibleRect(visible)&&visible.width()>0&&visible.height()>0;});check(focus[0],"remote traversal retains visible focus");
+            awaitFrames(activity);final boolean[] focus={false};runOnMainSync(()->{View v=activity.getCurrentFocus();Rect visible=new Rect();focus[0]=v!=null&&v.getGlobalVisibleRect(visible)&&visible.width()>0&&visible.height()>0;});check(focus[0],"remote traversal retains visible focus");
             boolean registered=false;for(android.content.pm.ResolveInfo homeEntry:c.getPackageManager().queryIntentActivities(SystemEntrypoints.homeQuery(),0))if(homeEntry.activityInfo!=null&&c.getPackageName().equals(homeEntry.activityInfo.packageName)&&homeEntry.activityInfo.enabled&&homeEntry.activityInfo.exported)registered=true;
             check(registered,"installed launcher exposes an enabled HOME entry");
             String actual=resolvedHome(c);home.edit().putString("ci_home_before",actual).commit();result.putString("homeResolution",actual);
@@ -59,7 +69,7 @@ public final class DeviceChecks extends Instrumentation {
             check(latch.await(10,TimeUnit.SECONDS)&&imported[0],"selected provider document imports without broad storage permission");
             File background=new File(home.getString("wallpaper_path",""));check(background.isFile()&&background.getName().matches("import-[0-9]+\\.png"),"unsafe provider display name cannot escape wallpaper library");
             check(background.getCanonicalPath().startsWith(wallpapers.library().getCanonicalPath()+File.separator),"import stays in the application library");
-            home.edit().putString("wallpaper_kind","builtin").commit();runOnMainSync(()->activity.render());waitForIdleSync();
+            home.edit().putString("wallpaper_kind","builtin").commit();runOnMainSync(()->activity.render());awaitFrames(activity);
             Bitmap capture=getUiAutomation().takeScreenshot();if(capture!=null){File dir=c.getExternalFilesDir(null);if(dir!=null)try(OutputStream out=new FileOutputStream(new File(dir,"ci-fresh.png"))){capture.compress(Bitmap.CompressFormat.PNG,100,out);}capture.recycle();}
             // Simulate old-version preferences, then let the runner perform an actual install -r.
             home.edit().remove("config_schema").putStringSet("favorites",new HashSet<>(Arrays.asList("com.example.saved"))).putString("wallpaper_kind","theme").putInt("theme",2).putString("groups","[{\"id\":\"favorites\",\"title\":\"Saved category\",\"row\":true},{\"id\":\"all\",\"title\":\"Apps\",\"row\":false}]").commit();
