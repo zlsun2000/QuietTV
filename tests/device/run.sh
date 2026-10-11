@@ -15,7 +15,11 @@ avd_name="quiettv-ci-$(echo "$image" | tr -cd '0-9')"
 out_dir="$project_root/build/device-checks"
 mkdir -p "$out_dir/gen" "$out_dir/classes" "$out_dir/dex" "$project_root/build/ci-artifacts"
 export ANDROID_AVD_HOME="$out_dir/avd"
-export ADB_VENDOR_KEYS="$out_dir/adbkey"
+export ANDROID_USER_HOME="$out_dir/android-user"
+export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+mkdir -p "$ANDROID_USER_HOME"
+# The guest's injected key and the host's authentication key must agree.
+export ADB_VENDOR_KEYS="$ANDROID_USER_HOME/adbkey"
 "$adb_bin" keygen "$ADB_VENDOR_KEYS"
 "$adb_bin" start-server
 avd_path="$ANDROID_AVD_HOME/$avd_name.avd"
@@ -44,18 +48,23 @@ while (( SECONDS < boot_deadline )); do
   sleep 2
 done
 [[ "$booted" == 1 ]] || { echo 'Emulator failed to boot' >&2; exit 1; }
+# Provision this guest in one connection before its first-boot USB/ADB reset.
+timeout 20s "$adb_bin" -s "$serial" shell 'settings put global adb_enabled 1 && settings put global device_provisioned 1 && settings put secure user_setup_complete 1 && settings put secure tv_user_setup_complete 1' > "$project_root/build/ci-artifacts/provision.log" 2>&1 || true
 # boot_completed may precede the first stable settings/package service connection.
 ready=0
 readiness_log="$project_root/build/ci-artifacts/boot-readiness.log"
 attempt=0
+offline_attempts=0
 for _ in $(seq 1 30); do
   attempt=$((attempt+1))
   state="$(timeout 5s "$adb_bin" -s "$serial" get-state 2>&1 || true)"
   printf 'attempt=%s state=%s\n' "$attempt" "$state" >> "$readiness_log"
-  if [[ "$state" != device ]]; then
-    # API 30 reports boot_completed before adbd can reconnect after first boot.
-    # Reconnect only this disposable guest, never other attached devices.
-    timeout 5s "$adb_bin" -s "$serial" reconnect >> "$readiness_log" 2>&1 || true
+  if [[ "$state" != device ]]; then offline_attempts=$((offline_attempts+1)); else offline_attempts=0; fi
+  if [[ "$offline_attempts" == 8 && "${GITHUB_ACTIONS:-false}" == true ]]; then
+    # A first-boot adbd restart can leave the emulator transport undiscovered.
+    # Reset only the disposable GitHub runner's server, never a local PC server.
+    timeout 5s "$adb_bin" kill-server >> "$readiness_log" 2>&1 || true
+    timeout 5s "$adb_bin" start-server >> "$readiness_log" 2>&1 || true
   fi
   if timeout 10s "$adb_bin" -s "$serial" shell pm path android >> "$readiness_log" 2>&1 && timeout 10s "$adb_bin" -s "$serial" shell settings get global device_provisioned >> "$readiness_log" 2>&1; then
     ready=$((ready+1)); [[ "$ready" == 3 ]] && break
