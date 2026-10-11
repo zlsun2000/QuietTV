@@ -118,7 +118,9 @@ done
 adb_device shell am start -W -n local.quiettv.launcher/.MainActivity
 foreground=0
 for _ in $(seq 1 20); do
-  adb_device shell dumpsys window windows > "$project_root/build/ci-artifacts/capture-window.txt"
+  # API 30 moves current focus into the display section, which the "windows"
+  # subcommand omits. The full dump includes actual window focus on all APIs.
+  adb_device shell dumpsys window > "$project_root/build/ci-artifacts/capture-window.txt"
   if grep -Eq 'mCurrentFocus=.*local\.quiettv\.launcher/' "$project_root/build/ci-artifacts/capture-window.txt"; then foreground=1; break; fi
   sleep 1
 done
