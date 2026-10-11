@@ -1,0 +1,40 @@
+name: Capture README screenshot
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  screenshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      QUIETTV_KEYSTORE_PASSWORD: quiettv-ci-ephemeral-password
+      QUIETTV_RUN_CHECKS: '1'
+      QUIETTV_EMULATOR_TESTS: '1'
+      QUIETTV_DOCUMENTATION_CAPTURE: '1'
+      QUIETTV_EMULATOR_IMAGE: system-images;android-28;android-tv;x86
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install official SDK components
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-28' 'build-tools;34.0.0' emulator "$QUIETTV_EMULATOR_IMAGE"
+          echo "QUIETTV_BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0" >> "$GITHUB_ENV"
+          sudo chmod 666 /dev/kvm
+      - name: Build the unchanged launcher UI
+        run: bash build.sh
+      - name: Capture the offline desktop in an isolated emulator
+        run: bash tests/device/run.sh
+      - name: Save the documentation image for visual review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: readme-ui-capture
+          path: build/ci-artifacts/ci-fresh.png
+          retention-days: 3

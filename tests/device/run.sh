@@ -112,6 +112,29 @@ for phase in fresh upgrade; do
   timeout 120s "$adb_bin" -s "$serial" shell am instrument -w -e phase "$phase" local.quiettv.checks/local.quiettv.launcher.DeviceChecks | tee "$project_root/build/ci-artifacts/$phase.txt"
   grep -q "INSTRUMENTATION_RESULT: passed=$phase:" "$project_root/build/ci-artifacts/$phase.txt"
 done
+if [[ "${QUIETTV_DOCUMENTATION_CAPTURE:-0}" == 1 ]]; then
+  [[ "$image" == 'system-images;android-28;android-tv;x86' ]] || { echo 'Documentation capture requires the isolated API 28 image' >&2; exit 1; }
+  # Only the disposable guest receives this synthetic, offline desktop setup.
+  # Keep the released UI and builtin background, with no accounts or history.
+  adb_device shell pm list packages > "$out_dir/documentation-packages.txt"
+  python3 - "$out_dir/documentation-packages.txt" "$out_dir/documentation-state.json" <<'PY'
+import json,pathlib,sys
+packages={line.strip().removeprefix('package:') for line in pathlib.Path(sys.argv[1]).read_text().splitlines()}
+favorites=sorted(packages & {'com.android.development','com.google.android.videos','com.android.tv.settings'})
+if not favorites:raise SystemExit('No documentation applications available')
+def value(kind,data):return {'type':kind,'value':data}
+state={'home':{'config_schema':value('int',1),'setup_seen':value('boolean',True),
+    'wallpaper_kind':value('string','builtin'),'favorites_initialized':value('boolean',True),
+    'favorites':value('set',favorites),'hidden':value('set',sorted(packages-set(favorites))),
+    'groups':value('string',json.dumps([{'id':'favorites','title':'常用应用','row':True},{'id':'all','title':'全部应用','row':False}],ensure_ascii=False))},
+    'playback_history':{'config_schema':value('int',1),'enabled':value('boolean',False),
+        'generic_enabled':value('boolean',False),'music_enabled':value('boolean',False),'records':value('string','[]')},'weather':{}}
+pathlib.Path(sys.argv[2]).write_text(json.dumps(state,ensure_ascii=False),encoding='utf-8')
+PY
+  adb_device shell am broadcast -a local.quiettv.launcher.EXPORT_STATE -n local.quiettv.launcher/.LocalMaintenanceReceiver
+  adb_device push "$out_dir/documentation-state.json" /sdcard/Android/data/local.quiettv.launcher/files/quiettv-state-backup.json
+  adb_device shell am broadcast -a local.quiettv.launcher.IMPORT_STATE -n local.quiettv.launcher/.LocalMaintenanceReceiver
+fi
 # Instrumentation finishes its Activity. Reopen it explicitly for a private
 # display capture; do not connect UiAutomation's unnecessary accessibility
 # service or read app-private external storage through the API 30 shell.
@@ -125,6 +148,7 @@ for _ in $(seq 1 20); do
   sleep 1
 done
 [[ "$foreground" == 1 ]] || { echo 'Launcher did not own the capture window' >&2; exit 1; }
+if [[ "${QUIETTV_DOCUMENTATION_CAPTURE:-0}" == 1 ]]; then sleep 2; fi
 adb_device exec-out screencap -p > "$project_root/build/ci-artifacts/ci-fresh.png"
 python3 - "$project_root/build/ci-artifacts/ci-fresh.png" <<'PY'
 import pathlib,sys

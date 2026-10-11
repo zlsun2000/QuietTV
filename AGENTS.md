@@ -18,7 +18,7 @@ Scope: this repository. Read docs/BUILD.md, docs/ARCHITECTURE.md and docs/CUSTOM
 - Preserve remote-only operation, focus retention, complete-row clipping, left/right pane bounds and directional overflow arrows. Scale to the actual app window.
 - Preserve existing preferences, backgrounds, record IDs and progress across upgrades. New optional network/history features are opt-in for fresh installs; migration must preserve existing choices.
 - Keep at most 8 history items, validated routes, local artwork checks, bounded imports/caches and provider identity verification. No credentials, account databases, notification text or playback URLs in launcher storage or logs.
-- Credentials, signing keys, device captures, generated APKs, SDKs, user media/configuration and private rollback packages stay out of Git. Never print credentials.
+- Credentials, signing keys, unreviewed device captures, generated APKs, SDKs, user media/configuration and private rollback packages stay out of Git. Only documentation screenshots explicitly requested for publication and reviewed for privacy/provenance may enter docs/images/, with their source recorded. Never print credentials.
 
 ## Validation and publishing
 

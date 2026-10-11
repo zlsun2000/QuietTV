@@ -16,7 +16,7 @@
 
 已观察到部分 Google Android TV 镜像原厂 HOME 具有更高优先级：`set-home-activity` 返回成功，实际解析仍可能是原厂。CI 单独记录 HOME 组件和未执行/受限项目，不能把这些当作接管成功；公开版保留原桌面，不为接管而停用它。API 30 的 `dumpsys window windows` 不包含当前焦点字段，截图检查使用完整 `dumpsys window`，并要求实际前台窗口属于静幕。
 
-CI 保留 API 23/28/30 的电视镜像：Android 6 使用官方 720p 电视配置，9/11 使用 1080p。API 23/30 使用 [Google 官方存档](https://developer.android.com/studio/emulator_archive) 的 35.2.10 模拟器并核对官方 SHA-256，API 28 使用 SDK 安装的版本。旧 Android 6 镜像的 DMA 分配器在 1080p、720p 均发生内核崩溃，因此只对该模拟器关闭 GLDMA 加速传输；API 30 还出现过首次启动 ADB 离线。这些属于测试环境失败，不能记作桌面通过。界面含持续背景动画，设备检查等待窗口创建及实际绘制帧，不依赖全局消息队列空闲。私有截图由限定的模拟器 ADB 直接导出，并检查前台窗口和 PNG，避免 API 28 的 UiAutomation 连接超时及 API 30 的应用私有外部目录访问限制；公开 CI 附件只保留文本日志。各次结果以 CI 日志为准，模拟器工具不进入 APK。
+CI 保留 API 23/28/30 的电视镜像：Android 6 使用官方 720p 电视配置，9/11 使用 1080p。API 23/30 使用 [Google 官方存档](https://developer.android.com/studio/emulator_archive) 的 35.2.10 模拟器并核对官方 SHA-256，API 28 使用 SDK 安装的版本。旧 Android 6 镜像的 DMA 分配器在 1080p、720p 均发生内核崩溃，因此只对该模拟器关闭 GLDMA 加速传输；API 30 还出现过首次启动 ADB 离线。这些属于测试环境失败，不能记作桌面通过。界面含持续背景动画，设备检查等待窗口创建及实际绘制帧，不依赖全局消息队列空闲。私有截图由限定的模拟器 ADB 直接导出，并检查前台窗口和 PNG，避免 API 28 的 UiAutomation 连接超时及 API 30 的应用私有外部目录访问限制；兼容性 CI 的公开附件只保留文本日志。手动 README 截图流程仅导出隔离环境的离线桌面，人工检查后再加入文档。各次结果以 CI 日志为准，模拟器工具不进入 APK。
 
 ## 继续播放
 
