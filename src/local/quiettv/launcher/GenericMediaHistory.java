@@ -20,7 +20,7 @@ final class GenericMediaHistory {
     static PlaybackRecord record(Context c,MediaController controller){
         String pkg=controller.getPackageName();if(!eligible(c,pkg))return null;MediaMetadata m=controller.getMetadata();PlaybackState state=controller.getPlaybackState();if(m==null||state==null)return null;
         PlaybackRecord r=new PlaybackRecord();r.source=pkg;r.sourceLabel=label(c,pkg);r.command="media/session";
-        r.title=first(m.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE),m.getString(MediaMetadata.METADATA_KEY_TITLE),240);if(r.title.isEmpty()||r.title.equals(r.sourceLabel))return null;
+        r.title=first(m.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE),m.getString(MediaMetadata.METADATA_KEY_TITLE),240);if(r.title.isEmpty()||r.title.equals(r.sourceLabel))r.title=r.sourceLabel;
         String artist=MediaRecordPolicy.text(m.getString(MediaMetadata.METADATA_KEY_ARTIST),160);r.album=MediaRecordPolicy.text(m.getString(MediaMetadata.METADATA_KEY_ALBUM),160);
         MediaController.PlaybackInfo info=controller.getPlaybackInfo();r.audio=info!=null&&info.getAudioAttributes()!=null&&info.getAudioAttributes().getContentType()==AudioAttributes.CONTENT_TYPE_MUSIC;
         r.episode=first(m.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE),r.audio?artist:"",160);if(r.episode.equals(r.title)||r.episode.equals(r.sourceLabel))r.episode="";
