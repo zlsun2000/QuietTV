@@ -18,9 +18,9 @@ final class GenericMediaHistory {
     static boolean eligible(Context c,String pkg){if(!MediaRecordPolicy.packageName(pkg)||PlaybackRecord.PACKAGE.equals(pkg)||c.getPackageName().equals(pkg))return false;try{return c.getPackageManager().getApplicationInfo(pkg,0).enabled&&launch(c,pkg)!=null;}catch(Exception ignored){return false;}}
     static List<MediaController> sessions(Context c){if(!permission(c))return Collections.emptyList();try{return ((MediaSessionManager)c.getSystemService(Context.MEDIA_SESSION_SERVICE)).getActiveSessions(listener(c));}catch(Exception ignored){return Collections.emptyList();}}
     static PlaybackRecord record(Context c,MediaController controller){
-        String pkg=controller.getPackageName();if(!eligible(c,pkg))return null;MediaMetadata m=controller.getMetadata();PlaybackState state=controller.getPlaybackState();if(m==null||state==null)return null;
+        String pkg=controller.getPackageName();if(!eligible(c,pkg))return null;MediaMetadata m=controller.getMetadata();PlaybackState state=controller.getPlaybackState();if(state==null)return null;if(m==null)m=new MediaMetadata.Builder().build();
         PlaybackRecord r=new PlaybackRecord();r.source=pkg;r.sourceLabel=label(c,pkg);r.command="media/session";
-        r.title=first(m.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE),m.getString(MediaMetadata.METADATA_KEY_TITLE),240);if(r.title.isEmpty()||r.title.equals(r.sourceLabel))r.title=r.sourceLabel;
+        r.title=MediaRecordPolicy.displayTitle(first(m.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE),m.getString(MediaMetadata.METADATA_KEY_TITLE),240),r.sourceLabel,pkg);
         String artist=MediaRecordPolicy.text(m.getString(MediaMetadata.METADATA_KEY_ARTIST),160);r.album=MediaRecordPolicy.text(m.getString(MediaMetadata.METADATA_KEY_ALBUM),160);
         MediaController.PlaybackInfo info=controller.getPlaybackInfo();r.audio=info!=null&&info.getAudioAttributes()!=null&&info.getAudioAttributes().getContentType()==AudioAttributes.CONTENT_TYPE_MUSIC;
         r.episode=first(m.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE),r.audio?artist:"",160);if(r.episode.equals(r.title)||r.episode.equals(r.sourceLabel))r.episode="";
@@ -33,7 +33,7 @@ final class GenericMediaHistory {
         r.updated=System.currentTimeMillis();r.clamp();return r.valid()?r:null;
     }
     private static String first(String a,String b,int max){String t=MediaRecordPolicy.text(a,max);return t.isEmpty()?MediaRecordPolicy.text(b,max):t;}
-    static MediaController current(Context c,PlaybackRecord target){if(!target.generic()||!target.valid())return null;for(MediaController controller:sessions(c))try{if(!target.source.equals(controller.getPackageName()))continue;PlaybackRecord actual=record(c,controller);PlaybackState state=controller.getPlaybackState();if(actual!=null&&actual.key().equals(target.key())&&state!=null&&(state.getState()==PlaybackState.STATE_PLAYING||(state.getState()==PlaybackState.STATE_PAUSED&&(state.getActions()&(PlaybackState.ACTION_PLAY|PlaybackState.ACTION_PLAY_PAUSE))!=0)))return controller;}catch(Exception ignored){}return null;}
+    static MediaController current(Context c,PlaybackRecord target){if(!target.generic()||!target.valid()||!MediaRecordPolicy.identifiable(target))return null;for(MediaController controller:sessions(c))try{if(!target.source.equals(controller.getPackageName()))continue;PlaybackRecord actual=record(c,controller);PlaybackState state=controller.getPlaybackState();if(actual!=null&&actual.key().equals(target.key())&&state!=null&&(state.getState()==PlaybackState.STATE_PLAYING||(state.getState()==PlaybackState.STATE_PAUSED&&(state.getActions()&(PlaybackState.ACTION_PLAY|PlaybackState.ACTION_PLAY_PAUSE))!=0)))return controller;}catch(Exception ignored){}return null;}
     static String action(Context c,PlaybackRecord r){return r.generic()&&current(c,r)!=null?"恢复当前播放":r.actionLabel();}
     static void open(Context c,PlaybackRecord r){
         MediaController controller=current(c,r);boolean opened=false;

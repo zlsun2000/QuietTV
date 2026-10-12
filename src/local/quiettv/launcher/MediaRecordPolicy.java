@@ -20,6 +20,18 @@ final class MediaRecordPolicy {
         return duration>0?Math.min(result,duration):result;
     }
     static boolean suppressed(long started,long updated,long removed,long cleared){return updated<=cleared||removed>=updated||(started>0&&(started<=removed||started<=cleared));}
+    /** Sessions may report no usable title; keep the record anchored to the source instead of dropping it. */
+    static String displayTitle(String title,String sourceLabel,String pkg){
+        String name=sourceLabel==null||sourceLabel.isEmpty()?pkg:sourceLabel;
+        return title==null||title.isEmpty()||title.equals(name)?name:title;
+    }
+    /** Placeholder records cannot prove which item a live session holds, so they never claim live resume. */
+    static boolean identifiable(PlaybackRecord record){
+        if(record==null)return false;
+        if(!record.contentId.isEmpty())return true;
+        String name=record.sourceLabel==null||record.sourceLabel.isEmpty()?record.source:record.sourceLabel;
+        return !record.title.isEmpty()&&!record.title.equals(name);
+    }
     static boolean sameItem(PlaybackRecord a,PlaybackRecord b){if(!a.generic()||!b.generic()||!a.source.equals(b.source)||!a.title.equals(b.title))return false;if(!a.contentId.isEmpty()&&!b.contentId.isEmpty())return a.contentId.equals(b.contentId)&&(a.episode.equals(b.episode)||a.episode.isEmpty()||b.episode.isEmpty())&&(a.album.equals(b.album)||a.album.isEmpty()||b.album.isEmpty());return a.episode.equals(b.episode)&&a.album.equals(b.album);}
     static void retainIdentity(PlaybackRecord record,PlaybackRecord old){if(!sameItem(record,old))return;record.videoId=old.videoId;if(record.contentId.isEmpty())record.contentId=old.contentId;if(record.episode.isEmpty())record.episode=old.episode;if(record.album.isEmpty())record.album=old.album;}
     private MediaRecordPolicy(){}

@@ -2,7 +2,7 @@
 
 ## 不使用电脑
 
-1. 从 [GitHub Releases](https://github.com/zlsun2000/QuietTV/releases/latest) 下载 `QuietTV-v0.12.0.apk`，不要下载名为 Source code 的源码压缩包。
+1. 从 [GitHub Releases](https://github.com/zlsun2000/QuietTV/releases/latest) 下载 `QuietTV-v0.13.0.apk`，不要下载名为 Source code 的源码压缩包。
 2. 放入 U 盘，或通过自己的文件传输工具发送到电视。用电视文件管理器打开 APK。固件提示时，仅允许该文件管理器安装应用。
 3. 安装后从应用列表打开“静幕”。方向键选择、确认键打开、长按确认键整理。内置背景、应用整理和时间可离线使用。
 4. 首次帮助页可以选择默认桌面。若按 Home 出现选择器，选择静幕并选“始终”；也可到系统“默认应用 / 主屏幕”。这些入口可能被电视厂商移除。
@@ -57,6 +57,10 @@
 
 从 Releases 下载更新并覆盖安装，保留收藏、分类、背景、天气及记录。部分固件更新后可能重置默认 HOME，需在帮助页检查并重新选择。官方发布使用固定签名；自己构建的不同签名不能直接覆盖官方版，Android 会拒绝。不要因此直接卸载有数据的版本。正式 versionCode 必须递增，旧 APK 通常不能原地降级。
 
+**0.12.0 升级到 0.13.0 是例外**：0.13.0 起发布签名密钥更换（此前的固定密钥不可用），0.12.0 及更早版本无法覆盖升级，必须先卸载再安装，应用内配置、收藏与记录会丢失。0.13.0 起恢复固定签名，后续版本回到覆盖升级。
+
+0.13.0（versionCode 21）：修复 Netflix 等无标题播放记录丢失，新增可选的 Home 键修复，安装指南补充 Play Protect 说明。升级注意见上一段。
+
 0.12.0（versionCode 20）可覆盖开发工作区此前的 0.11 与回退包 19。已有配置和记录保留；全新安装默认关闭天气和记录。公开版移除专用音乐续播、自动 IP 定位、目录补资料与网络封面；旧天气须确认新服务条件并手动选城市才联网，旧音乐卡片仅打开应用。详见 [审查与范围](LEGAL-REVIEW.md)。
 
 ## 恢复原桌面
@@ -71,12 +75,12 @@
 
 ```powershell
 adb connect TV_IP:5555
-adb -s TV_IP:5555 install -r QuietTV-v0.12.0.apk
+adb -s TV_IP:5555 install -r QuietTV-v0.13.0.apk
 # 打开界面（会切换电视画面）
 adb -s TV_IP:5555 shell am start -n local.quiettv.launcher/.MainActivity
 ```
 
-也可使用 `install-preview.ps1 -Device TV_IP:5555 -Apk .\QuietTV-v0.12.0.apk`。默认仅安装；加 `-Launch` 才打开画面。默认不修改安装验证设置。仅遇到已确认的固件安装验证兼容问题时，可显式加 `-UseAdbVerifierWorkaround`，它会暂时修改 ADB 验证开关并在 finally 中核对恢复。
+也可使用 `install-preview.ps1 -Device TV_IP:5555 -Apk .\QuietTV-v0.13.0.apk`。默认仅安装；加 `-Launch` 才打开画面。默认不修改安装验证设置。仅遇到已确认的固件安装验证兼容问题时，可显式加 `-UseAdbVerifierWorkaround`，它会暂时修改 ADB 验证开关并在 finally 中核对恢复。
 
 在支持以下命令的固件上可手动选择默认桌面：
 
