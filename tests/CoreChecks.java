@@ -11,6 +11,13 @@ public final class CoreChecks {
         check(DevicePolicy.tclPorts("HDMI 3, DTV, AV2","HDMI1","Unknown").toString().equals("[HDMI3, DTV, AV2]"),"reported ports override fallback and legacy metadata");
         check(DevicePolicy.tclPorts("HDMI10, HDTV, XHDMI2","","Unknown").isEmpty(),"substring matches cannot invent physical ports");
         check(DevicePolicy.tclPorts(null,"HDMI1 HDMI1 TV",null).size()==2,"legacy metadata handles missing fields and duplicate ports");
+        check(DevicePolicy.accessibilityServiceEnabled("local.quiettv.launcher/.HomeKeyService","local.quiettv.launcher","local.quiettv.launcher.HomeKeyService"),"enabled accessibility list accepts the shorthand component");
+        check(DevicePolicy.accessibilityServiceEnabled("com.other/.Svc:local.quiettv.launcher/local.quiettv.launcher.HomeKeyService","local.quiettv.launcher","HomeKeyService"),"full class names match among other enabled services");
+        check(DevicePolicy.accessibilityServiceEnabled("local.quiettv.launcher/.HomeKeyService2: local.quiettv.launcher/.HomeKeyService ","local.quiettv.launcher","HomeKeyService"),"whitespace around colon-separated entries is tolerated");
+        check(!DevicePolicy.accessibilityServiceEnabled("local.quiettv.launcher/.HomeKeyServiceExtra","local.quiettv.launcher","HomeKeyService"),"lookalike service names are not accepted");
+        check(!DevicePolicy.accessibilityServiceEnabled("local.quiettv.launcher/HomeKeyService","local.quiettv.launcher","HomeKeyService"),"class names without a package path are not accepted");
+        check(!DevicePolicy.accessibilityServiceEnabled("com.evil/local.quiettv.launcher.HomeKeyService","local.quiettv.launcher","HomeKeyService"),"foreign packages cannot claim QuietTV's service");
+        check(!DevicePolicy.accessibilityServiceEnabled(null,"local.quiettv.launcher","HomeKeyService")&&!DevicePolicy.accessibilityServiceEnabled("","local.quiettv.launcher","HomeKeyService"),"missing settings never report the Home key fix as armed");
         check(UiMetrics.scale(0,0)==1f&&UiMetrics.units(0,0)==1280,"not-yet-measured windows have safe layout dimensions");
         for(int[] window:new int[][]{{1280,720},{1920,1080},{3840,2160}}){check(UiMetrics.units(window[0],window[1])==1280,"16:9 sizes retain design geometry");}
         java.util.Properties props=new java.util.Properties();props.setProperty("grid.columns","0");props.setProperty("favorites.ratio","NaN");props.setProperty("clock.size","999");UiConfig config=new UiConfig(props);

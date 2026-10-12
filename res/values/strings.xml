@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_key_fix_description">过滤遥控器 Home 键，把静幕调到前台，代替优先接管 Home 键的原厂桌面。仅在静幕的 Home 键修复开启后生效；只处理 Home 键，不读取界面内容。可在系统设置中随时停用。</string>
+</resources>

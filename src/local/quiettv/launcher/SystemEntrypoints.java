@@ -20,6 +20,7 @@ final class SystemEntrypoints {
         new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName("com.tcl.settings","com.tcl.settings.ui.MainActivity")));}
     static Intent inputSettings(Context c){return first(c,new Intent("android.settings.TV_INPUT_SETTINGS"));}
     static Intent homeSettings(Context c){return first(c,new Intent(Settings.ACTION_HOME_SETTINGS));}
+    static Intent accessibilitySettings(Context c){return first(c,new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));}
     static boolean defaultHome(Context c){try{ResolveInfo r=c.getPackageManager().resolveActivity(homeQuery(),PackageManager.MATCH_DEFAULT_ONLY);return r!=null&&r.activityInfo!=null&&c.getPackageName().equals(r.activityInfo.packageName);}catch(Exception e){return false;}}
     static ArrayList<ResolveInfo> otherHomes(Context c){
         ArrayList<ResolveInfo> result=new ArrayList<>();HashSet<String> seen=new HashSet<>();
