@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.quiettv.launcher" android:versionCode="21" android:versionName="0.13.0">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.quiettv.launcher" android:versionCode="22" android:versionName="0.13.1-test">
     <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.INTERNET" />

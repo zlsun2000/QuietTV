@@ -1,3 +1,7 @@
+# 0.13.1-test
+
+- Local TV test build for the P1/P2/P3 compatibility improvements: more reliable Home and media status, responsive input-source updates, safer background import/video fallback, clearer capability reporting, and improved locale, font-scale, RTL, and accessibility support. This build is not a public release and does not establish broad OEM compatibility.
+
 # 0.13.0
 
 - 发布签名密钥更换（此前的固定密钥不可用）：0.12.0 及更早版本不能覆盖升级到 0.13.0，需卸载重装，应用内配置、收藏与记录会丢失；0.13.0 起恢复固定签名，后续版本可覆盖升级。
