@@ -21,11 +21,11 @@
         <intent><action android:name="android.settings.ACCESSIBILITY_SETTINGS" /></intent>
         <intent><action android:name="android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS" /></intent>
     </queries>
-    <application android:label="静幕" android:icon="@drawable/icon" android:banner="@drawable/banner" android:allowBackup="false" android:theme="@android:style/Theme.Material.NoActionBar" android:supportsRtl="true">
-        <service android:name=".MediaHistoryService" android:label="静幕 · 播放记录" android:exported="true" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+    <application android:label="@string/app_name" android:icon="@drawable/icon" android:banner="@drawable/banner" android:allowBackup="false" android:theme="@android:style/Theme.Material.NoActionBar" android:supportsRtl="true">
+        <service android:name=".MediaHistoryService" android:label="@string/media_history_service_name" android:exported="true" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
         </service>
-        <service android:name=".HomeKeyService" android:label="静幕 · Home 键修复" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+        <service android:name=".HomeKeyService" android:label="@string/home_key_service_name" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/home_key_service" />
         </service>

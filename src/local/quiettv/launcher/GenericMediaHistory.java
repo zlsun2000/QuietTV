@@ -18,7 +18,8 @@ final class GenericMediaHistory {
     static boolean eligible(Context c,String pkg){if(!MediaRecordPolicy.packageName(pkg)||c.getPackageName().equals(pkg))return false;try{return c.getPackageManager().getApplicationInfo(pkg,0).enabled&&launch(c,pkg)!=null;}catch(Exception ignored){return false;}}
     static boolean lowRamListenerUnsupported(Context c){try{return Build.VERSION.SDK_INT<=29&&((android.app.ActivityManager)c.getSystemService(Context.ACTIVITY_SERVICE)).isLowRamDevice();}catch(Exception ignored){return false;}}
     static boolean serviceConnected(){return MediaHistoryService.active;}
-    static String availability(Context c){if(lowRamListenerUnsupported(c))return "此低内存系统不支持媒体识别";if(!permission(c))return "未授权，可选";if(serviceConnected())return "已授权 · 正在运行";return "已授权 · 等待系统连接";}
+    static DeviceCapability capability(Context c){if(lowRamListenerUnsupported(c))return DeviceCapability.unsupported("media_sessions","此低内存系统不支持媒体识别");if(!permission(c))return DeviceCapability.optional("media_sessions","未授权，可选");if(serviceConnected())return DeviceCapability.available("media_sessions","已授权 · 正在运行");return DeviceCapability.waiting("media_sessions","已授权 · 等待系统连接");}
+    static String availability(Context c){return capability(c).reason;}
     static List<MediaController> sessions(Context c){if(!permission(c)||lowRamListenerUnsupported(c))return Collections.emptyList();try{MediaSessionManager manager=(MediaSessionManager)c.getSystemService(Context.MEDIA_SESSION_SERVICE);return manager==null?Collections.<MediaController>emptyList():manager.getActiveSessions(listener(c));}catch(Exception ignored){return Collections.emptyList();}}
     static PlaybackRecord record(Context c,MediaController controller){
         String pkg=controller.getPackageName();if(!eligible(c,pkg))return null;MediaMetadata m=controller.getMetadata();PlaybackState state=controller.getPlaybackState();if(state==null)return null;if(m==null)m=new MediaMetadata.Builder().build();

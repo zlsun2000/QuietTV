@@ -16,13 +16,13 @@ final class WeatherButton extends View {
         if(isFocused()){paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(host.dp(2));paint.setColor(0xffedf4f6);c.drawRoundRect(frame,host.dp(16),host.dp(16),paint);}
         WeatherRepository.Data d=weather.data();
         if(d==null){line(c,weather.message(),14,27,15,0xffd4e0e7,"sans-serif");setContentDescription(weather.message());return;}
-        icon(c,host.dp(23),host.dp(21),d.code);
-        String summary=d.place.name+"  "+WeatherRepository.degrees(d.temperature)+"  "+WeatherRepository.condition(d.code)+(d.stale()?" · 旧":"");
+        boolean rtl=getLayoutDirection()==View.LAYOUT_DIRECTION_RTL;icon(c,rtl?getWidth()-host.dp(23):host.dp(23),host.dp(21),d.code);
+        String summary=d.place.name+"  "+weather.degrees(d.temperature)+"  "+weather.conditionLabel(d.code)+(d.stale()?host.getString(R.string.weather_status_stale):"");
         line(c,summary,47,21,16,0xffedf4f6,"sans-serif-medium");
-        line(c,"Open-Meteo.com ↗ 长按",47,35,9,0xffd4e0e7,"sans-serif");
-        setContentDescription(d.place.name+"，"+WeatherRepository.degrees(d.temperature)+"，"+WeatherRepository.condition(d.code)+"，来源 Open-Meteo，确认键查看预报，长按打开来源网站");
+        line(c,host.getString(R.string.weather_source_hint),47,35,9,0xffd4e0e7,"sans-serif");
+        setContentDescription(host.getString(R.string.weather_content_description,d.place.name,weather.degrees(d.temperature),weather.conditionLabel(d.code)));
     }
-    private void line(Canvas c,String value,int x,int y,int size,int color,String font){paint.setStyle(Paint.Style.FILL);paint.setColor(color);paint.setTypeface(Typeface.create(font,0));paint.setTextAlign(Paint.Align.LEFT);paint.setTextSize(host.dp(size));String text=TextUtils.ellipsize(value,new android.text.TextPaint(paint),getWidth()-host.dp(x+14),TextUtils.TruncateAt.END).toString();c.drawText(text,host.dp(x),host.dp(y),paint);}
+    private void line(Canvas c,String value,int x,int y,int size,int color,String font){boolean rtl=getLayoutDirection()==View.LAYOUT_DIRECTION_RTL;paint.setStyle(Paint.Style.FILL);paint.setColor(color);paint.setTypeface(Typeface.create(font,0));paint.setTextAlign(rtl?Paint.Align.RIGHT:Paint.Align.LEFT);paint.setTextSize(host.sp(size));String text=TextUtils.ellipsize(value,new android.text.TextPaint(paint),getWidth()-host.dp(x+14),TextUtils.TruncateAt.END).toString();c.drawText(text,rtl?getWidth()-host.dp(x):host.dp(x),host.dp(y),paint);}
     private void icon(Canvas c,float x,float y,int code){
         paint.setColor(0xffedf4f6);paint.setStrokeWidth(host.dp(2));paint.setStyle(Paint.Style.STROKE);
         if(code<=1){c.drawCircle(x,y,host.dp(8),paint);for(int i=0;i<8;i++){double angle=i*Math.PI/4;c.drawLine(x+(float)Math.cos(angle)*host.dp(13),y+(float)Math.sin(angle)*host.dp(13),x+(float)Math.cos(angle)*host.dp(17),y+(float)Math.sin(angle)*host.dp(17),paint);}}

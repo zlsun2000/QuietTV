@@ -20,6 +20,7 @@ final class InputSources {
         int id,number,state=-1; String name,device="",enumName,inputId=""; Object source;Intent intent;
         String key(){return "input:"+(inputId.isEmpty()?String.valueOf(id):inputId);}
     }
+    static DeviceCapability capability(int visiblePorts){return visiblePorts>0?DeviceCapability.available("tv_inputs",visiblePorts+" 个可启动入口"):DeviceCapability.optional("tv_inputs","系统未报告可启动输入源");}
     private final Context context;
     private final Handler main=new Handler(android.os.Looper.getMainLooper());
     private final ExecutorService worker=Executors.newSingleThreadExecutor();

@@ -44,7 +44,8 @@ final class Wallpapers {
     private final Runnable videoFrameGuard=new Runnable(){public void run(){MediaPlayer p=player;if(p==null||!active||disposed||!videoReady)return;try{long stalled=android.os.SystemClock.uptimeMillis()-lastVideoFrameAt;if((!p.isPlaying()||videoFrames==guardVideoFrames)&&stalled>15000){failedVideo();return;}guardVideoFrames=videoFrames;videoHandler.postDelayed(this,5000);}catch(Exception e){if(player==p)failedVideo();}}};
     Wallpapers(Activity a,SharedPreferences p){owner=a;prefs=p;}
     String kind(){return prefs.getString("wallpaper_kind","builtin");}
-    String videoStatus(){if(!kind().equals("video"))return "未使用";if(videoFailed)return "失败，已回退静态背景";if(videoReady)return "播放器已准备，帧输出待实机验证";return active?"正在准备":"已暂停";}
+    DeviceCapability videoCapability(){if(!kind().equals("video"))return DeviceCapability.inactive("video_wallpaper","未使用");if(videoFailed)return DeviceCapability.unsupported("video_wallpaper","失败，已回退静态背景");if(videoReady&&videoFrames>0)return DeviceCapability.available("video_wallpaper",owner.getString(R.string.video_frames_output));if(videoReady)return DeviceCapability.waiting("video_wallpaper",owner.getString(R.string.video_waiting_first_frame));return DeviceCapability.waiting("video_wallpaper",active?"正在准备":"已暂停");}
+    String videoStatus(){return videoCapability().reason;}
     File library(){File f=owner.getExternalFilesDir("backgrounds");if(f==null)f=new File(owner.getFilesDir(),"backgrounds");f.mkdirs();return f;}
     boolean inLibrary(File file){try{String root=library().getCanonicalPath()+File.separator;return file.getCanonicalPath().startsWith(root);}catch(Exception ignored){return false;}}
     String librarySummary(){File[] files=library().listFiles();long bytes=0;int count=0;if(files!=null)for(File f:files)if(f.isFile()&&!f.getName().startsWith(".")){bytes+=f.length();count++;}return count+" 项 · "+(bytes/1048576)+" MB";}
