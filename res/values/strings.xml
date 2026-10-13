@@ -75,7 +75,7 @@
     <string name="input_connected">已连接</string>
     <string name="input_standby">已连接 · 待机</string>
     <string name="input_disconnected">未连接</string>
-    <string name="input_unknown">系统未提供状态</string>
+    <string name="input_unknown">接入状态未确认</string>
     <string name="input_tuner">天线 / 有线电视</string>
     <string name="input_devices">%1$d 个设备</string>
     <string name="input_choose_device">选择 %1$s 的设备</string>

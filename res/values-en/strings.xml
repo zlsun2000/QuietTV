@@ -75,7 +75,7 @@
     <string name="input_connected">Connected</string>
     <string name="input_standby">Connected · Standby</string>
     <string name="input_disconnected">Disconnected</string>
-    <string name="input_unknown">Status unavailable</string>
+    <string name="input_unknown">Connection status unconfirmed</string>
     <string name="input_tuner">Antenna / Cable TV</string>
     <string name="input_devices">%1$d devices</string>
     <string name="input_choose_device">Choose a device on %1$s</string>

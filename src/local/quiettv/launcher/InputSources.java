@@ -21,6 +21,7 @@ final class InputSources {
     interface ScanCallback {void complete(ArrayList<Port> ports);}
     static final class Port {
         int id,number,sortNumber,state=UNKNOWN;
+        boolean directConnectionState;
         String name="",device="",enumName="",inputId="",parentId="",baseLabel="";
         final ArrayList<Port> children=new ArrayList<>();
         Object source;Intent intent;
@@ -28,6 +29,16 @@ final class InputSources {
     }
     static int standardState(int state){return state==TvInputManager.INPUT_STATE_CONNECTED?CONNECTED:state==TvInputManager.INPUT_STATE_CONNECTED_STANDBY?STANDBY:state==TvInputManager.INPUT_STATE_DISCONNECTED?DISCONNECTED:UNKNOWN;}
     static int insertedState(Object value){return value instanceof Boolean?((Boolean)value?CONNECTED:DISCONNECTED):UNKNOWN;}
+    private static boolean logicalDevice(Port p){return hdmi(p)&&!p.parentId.isEmpty()&&!p.parentId.equals(p.inputId);}
+    static int displayState(Port p){
+        // Physical hardware CONNECTED may mean only that stream configurations exist;
+        // STANDBY may represent unknown cable/hotplug status. Neither proves insertion.
+        // Explicit disconnection wins over a possibly stale logical device entry.
+        if(p.state==DISCONNECTED||p.directConnectionState||logicalDevice(p))return p.state;
+        boolean standby=false;for(Port child:p.children){if(child.state==CONNECTED)return CONNECTED;if(child.state==STANDBY)standby=true;}
+        return standby?STANDBY:UNKNOWN;
+    }
+    static int knownDeviceCount(Port p){int count=0;for(Port child:p.children)if(child.state==CONNECTED||child.state==STANDBY)count++;return count;}
     // This number only orders labels. It must never become a physical routing ID.
     static int labelNumber(String label){if(label==null)return 0;Matcher m=HDMI_LABEL.matcher(label.trim());return m.find()?Integer.parseInt(m.group(1)):0;}
     private static boolean hdmi(Port p){return "ANDROID_HDMI".equals(p.enumName)||p.enumName.startsWith("EN_TCL_HDMI");}
@@ -59,10 +70,11 @@ final class InputSources {
     static String remapSelection(String selected,Map<String,String> aliases){int split=selected.indexOf('|');String prefix=split<0?"":selected.substring(0,split+1),key=selected.substring(split+1);return prefix+(aliases.containsKey(key)?aliases.get(key):key);}
     static String status(Context c,Port p){
         if(tuner(p))return c.getString(R.string.input_tuner);
-        String state=c.getString(p.state==CONNECTED?R.string.input_connected:p.state==STANDBY?R.string.input_standby:p.state==DISCONNECTED?R.string.input_disconnected:R.string.input_unknown);
-        if(p.state!=CONNECTED&&p.state!=STANDBY)return state;
-        if(p.children.size()>1)return c.getString(R.string.input_devices,p.children.size())+" · "+state;
-        String device=p.children.size()==1?p.children.get(0).name:p.device;
+        int display=displayState(p);
+        String state=c.getString(display==CONNECTED?R.string.input_connected:display==STANDBY?R.string.input_standby:display==DISCONNECTED?R.string.input_disconnected:R.string.input_unknown);
+        if(display!=CONNECTED&&display!=STANDBY)return state;
+        int count=knownDeviceCount(p);if(count>1)return c.getString(R.string.input_devices,count)+" · "+state;
+        String device=p.device;for(Port child:p.children)if(child.state==CONNECTED||child.state==STANDBY){device=child.name;break;}
         return device.isEmpty()?state:device+" · "+state;
     }
     static DeviceCapability capability(int visiblePorts){return visiblePorts>0?DeviceCapability.available("tv_inputs",visiblePorts+" 个可启动入口"):DeviceCapability.optional("tv_inputs","系统未报告可启动输入源");}
@@ -115,7 +127,7 @@ final class InputSources {
                 Port p=new Port();p.source=source;p.enumName=enumName;p.id=((Enum<?>)source).ordinal();p.name=name.equals("DTV")||name.equals("TV")?"TV":name.equals("ATV")?"模拟 TV":name.replace("HDMI","HDMI ").replace("AV","AV ");
                 p.baseLabel=p.name;if(name.startsWith("HDMI"))p.number=p.sortNumber=Integer.parseInt(name.substring(4));
                 p.intent=new Intent(tv).putExtra("targetSourceId",p.id).putExtra("referer",context.getPackageName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                try{p.state=insertedState(call(common,"isInserted",new Class<?>[]{sourceClass},source));}
+                try{Object inserted=call(common,"isInserted",new Class<?>[]{sourceClass},source);p.state=insertedState(inserted);p.directConnectionState=inserted instanceof Boolean;}
                 catch(Exception e){diagnostics.append("status ").append(name).append(": ").append(error(e)).append('\n');}
                 result.add(p);
             }

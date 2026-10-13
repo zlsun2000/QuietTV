@@ -39,6 +39,29 @@ public final class CoreChecks {
         check(InputSources.remapKeys(mapped,aliases).equals(mapped),"input preference migration is idempotent");
         check(InputSources.remapSelection("favorites|"+child.key(),aliases).equals("favorites|"+two.key()),"focus follows a grouped card in any category");
         check(InputSources.remapSelection("",aliases).equals("")&&InputSources.remapSelection("all|other-app",aliases).equals("all|other-app"),"unrelated and empty focus keys are preserved");
+        InputSources.Port physical=port("brand.c/port","","HDMI 1");physical.state=InputSources.CONNECTED;
+        check(InputSources.displayState(physical)==InputSources.UNKNOWN,"physical stream availability cannot assert a cable connection");
+        physical.state=InputSources.STANDBY;check(InputSources.displayState(physical)==InputSources.UNKNOWN,"physical standby without a logical device may mean unknown hotplug status");
+        InputSources.Port av=port("brand.c/av","","AV");av.enumName="ANDROID_INPUT";av.state=InputSources.CONNECTED;
+        check(InputSources.displayState(av)==InputSources.UNKNOWN,"registered AV stream configurations do not prove an inserted device");
+        av.state=InputSources.DISCONNECTED;check(InputSources.displayState(av)==InputSources.DISCONNECTED,"explicit physical disconnection is retained");
+        physical.state=InputSources.CONNECTED;physical.directConnectionState=true;
+        check(InputSources.displayState(physical)==InputSources.CONNECTED,"a dedicated insertion API can confirm physical connection");
+        physical.state=InputSources.UNKNOWN;check(InputSources.displayState(physical)==InputSources.UNKNOWN,"failed dedicated status never implies a connection");physical.directConnectionState=false;
+        InputSources.Port console=port("brand.c/console",physical.inputId,"Console");physical.children.add(console);physical.state=InputSources.CONNECTED;console.state=InputSources.STANDBY;
+        check(InputSources.displayState(physical)==InputSources.STANDBY,"logical device standby takes precedence over physical stream availability");
+        physical.state=InputSources.STANDBY;console.state=InputSources.CONNECTED;
+        check(InputSources.displayState(physical)==InputSources.CONNECTED,"logical device running state is not replaced by ambiguous physical standby");
+        physical.state=InputSources.UNKNOWN;check(InputSources.displayState(physical)==InputSources.CONNECTED,"a logical device can provide state when physical status is unavailable");
+        physical.state=InputSources.DISCONNECTED;check(InputSources.displayState(physical)==InputSources.DISCONNECTED,"an explicitly disconnected parent cannot display a stale connected child");
+        physical.state=InputSources.CONNECTED;console.state=InputSources.DISCONNECTED;
+        check(InputSources.displayState(physical)==InputSources.UNKNOWN&&InputSources.knownDeviceCount(physical)==0,"a disconnected CEC child does not imply the whole port is unplugged or contribute a device label");
+        console.state=InputSources.UNKNOWN;check(InputSources.displayState(physical)==InputSources.UNKNOWN,"a logical child with unknown power state cannot confirm connection");
+        InputSources.Port player=port("brand.c/player",physical.inputId,"Player");physical.children.add(player);player.state=InputSources.STANDBY;
+        check(InputSources.displayState(physical)==InputSources.STANDBY&&InputSources.knownDeviceCount(physical)==1,"one known standby device is retained among unknown children");
+        console.state=InputSources.CONNECTED;check(InputSources.displayState(physical)==InputSources.CONNECTED&&InputSources.knownDeviceCount(physical)==2,"a running logical device wins when another device is in standby");
+        check(InputSources.displayState(player)==InputSources.STANDBY,"orphan logical routes retain their reported device power state");
+        check(InputSources.compare(one,two)<0&&InputSources.aliases(grouped).equals(aliases),"status presentation leaves sorting and stable aliases unchanged");
     }
     public static void main(String[] args){
         inputChecks();

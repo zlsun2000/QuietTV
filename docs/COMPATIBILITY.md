@@ -9,7 +9,7 @@
 | 环境 | 已知结果 | 限制 |
 | --- | --- | --- |
 | 雷鸟 50F295C-JN，Android 9 | 0.7–0.11 使用期间验证了导航、应用整理、重启 HOME、动态背景、左右分区与部分精确续播 | 物理面板 4K，应用窗口 1080p；0.12.0 新安装引导与通用分支独立验证，不假定同机旧版本测试覆盖所有新改动 |
-| 所有者当前 TCL 电视，系统型号 Smart_TV_Pro / G09，Android 12/API 31 | 0.13.1-test 所有者反馈及授权只读检查确认了 HDMI 卡片重复、排序异常；原始系统状态含待机，旧代码将其显示为未知 | 0.13.2-test 修复的实际切换、拔插、待机更新和背景导入仍需所有者验收；该设备没有证明其他 OEM 通过 |
+| 所有者当前 TCL 电视，系统型号 Smart_TV_Pro / G09，Android 12/API 31 | 0.13.1-test 反馈确认重复/排序异常；0.13.2-test 所有者确认顺序和游戏机运行/待机显示正常，但空 HDMI1/3 与 AV 错报已连接 | 0.13.3-test 改为区分物理端口的模糊状态与逻辑设备状态，修正展示仍待验收；实际切换、拔插和背景导入尚未受控验证；不能代表其他 OEM |
 | 隔离 Android TV 6 / 9 / 11 模拟器 | 已配置安装、首次打开、焦点、背景导入及升级；9/11 另测选定 HOME，结果以 workflow 为准 | Android 6 无对应 shell 命令，未模拟默认桌面选择；虚拟环境不能验证厂商开机限制、物理 HDMI、真实解码器及 DRM |
 | 其他品牌电视/盒子与新版系统 | 能力检测和无权限降级已实现 | 尚需社区实机反馈；不承诺全部厂商完全兼容 |
 
@@ -30,7 +30,11 @@ CI 保留 API 23/28/30 的电视镜像：Android 6 使用官方 720p 电视配�
 
 2026-10-13/14 所有者在当前 Android 12 电视使用 0.13.1-test 时报告 Netflix、YouTube 有桌面记录，B 站 `com.xiaodianshi.tv.yst` 1.7.7 无记录；没有受控验证内容、进度或续播。授权只读快照当时无 B 站活动会话，不能据此断言播放时也没有会话。0.13.2-test 增加标准会话状态快照，并修复 Android 8+ 兼容渠道隐式广播仅注册在 manifest 的接收缺口，仍需确认该版本 B 站是否发送现有契约；没有媒体接口的应用仍不能自动产生历史。背景导入尚未在该电视测试。
 
+2026-10-14 所有者反馈 0.13.2-test 的 B 站记录仍无效，按要求推迟后续调查；本轮 0.13.3-test 只修输入状态展示，不增加媒体来源或接口。
+
 标准输入的父子合并及待机状态依据 [TvInputInfo](https://developer.android.com/reference/android/media/tv/TvInputInfo#getParentId()) 与 [TvInputManager](https://developer.android.com/reference/android/media/tv/TvInputManager#INPUT_STATE_CONNECTED_STANDBY) 的公开契约；渠道广播运行时注册依据 [Android 8 广播限制](https://developer.android.com/about/versions/oreo/background#broadcasts)。这些契约不保证固件准确报告连接状态、提供端口标签或实际允许切换。未提供关系时保留独立输入，未提供排序数字时保持稳定排序；无输入登记的盒子不生成假 HDMI 卡片。
+
+[AOSP 硬件实现](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-16.0.0_r3/services/core/java/com/android/server/tv/TvInputHardwareManager.java) 的 `getInputStateLocked` 可在未更新线缆状态时依据流配置返回连接，HDMI 热插拔未知/关闭也可报告待机。[逻辑设备实现](https://android.googlesource.com/platform/frameworks/base/+/master/services/core/java/com/android/server/tv/TvInputManagerService.java) 则根据 HDMI 设备电源状态更新子输入。0.13.3-test 因此单独处理逻辑设备状态与物理接入证据，标准物理端口未知时不显示已连接，也不凭缺少 CEC 条目断言未连接；这不是型号特判，不能保证检测所有 HDMI/AV 线缆或视频信号。
 
 当前开发电视没有可利用的 Watch Next Provider。首版不采集各平台账户的完整历史，也不绕过订阅、DRM、应用内广告或清晰度限制。
 

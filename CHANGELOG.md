@@ -1,3 +1,9 @@
+# 0.13.3-test
+
+- Stop presenting ambiguous Android hardware stream/hotplug states as a confirmed cable connection. Standard HDMI and AV ports without logical device evidence show an unconfirmed status and remain selectable; non-CEC devices are not assumed to be unplugged.
+- Use logical HDMI device states for running/standby display, retaining explicit parent disconnection and dedicated OEM insertion reports. Exclude disconnected or unknown logical devices from displayed names/counts. Input ordering, grouping and preferences remain unchanged.
+- Owner confirmed 0.13.2-test input order and console running/standby display, but empty HDMI/AV ports were falsely labeled connected. Bilibili history still failed and is deferred at the owner's request. This build's corrected status presentation remains pending device acceptance.
+
 # 0.13.2-test
 
 - Group standard Android TV HDMI inputs by their explicit parent relationship to avoid duplicate port/device cards. Preserve custom labels and preferences; multiple devices on one port retain a selection menu. Orphaned inputs keep their own routes.
