@@ -21,11 +21,11 @@ public final class BiliHistoryReceiver extends BroadcastReceiver {
             if(!PlaybackRecord.PACKAGE.equals(source)&&!PlaybackRecord.PACKAGE.equals(pkg)&&!"com.xiaodianshi.tv.yst.external".equals(source))return;
             PlaybackRecord r=new PlaybackRecord();r.videoId=string(extras,"videoId",18);r.episodeId=string(extras,"episodeId",18);r.title=string(extras,"videoName",240);r.episode=string(extras,"episodeName",160);r.command=string(extras,"cmdInfo",40);r.cover=Covers.safeUrl(string(extras,"videoImgUrl",1500));r.position=number(extras,"currentPosition");r.duration=number(extras,"duration");r.updated=System.currentTimeMillis();r.clamp();
             HistoryStore store=new HistoryStore(context);if(!store.enabled())return;
-            if("com.tv.history.del.tolauncher".equals(intent.getAction())){if(!PlaybackRecord.numeric(r.videoId))return;store.removeVideo(r.videoId);context.sendBroadcast(new Intent(HistoryStore.CHANGED).setPackage(context.getPackageName()));return;}
+            if("com.tv.history.del.tolauncher".equals(intent.getAction())){if(!PlaybackRecord.numeric(r.videoId))return;store.removeVideo(r.videoId);GenericMediaHistory.changed(context);return;}
             if(!r.valid())return;
             if("com.tv.history.add".equals(intent.getAction()))store.put(r);
             else return;
-            context.sendBroadcast(new Intent(HistoryStore.CHANGED).setPackage(context.getPackageName()));
+            GenericMediaHistory.changed(context);
         }catch(Exception ignored){}
     }
     private static String string(Bundle b,String key,int max){Object value=b.get(key);if(!(value instanceof String)&&!(value instanceof Number))return "";String text=String.valueOf(value).trim();return text.length()<=max?text:"";}

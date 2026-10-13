@@ -15,12 +15,16 @@ public final class MediaHistoryService extends NotificationListenerService {
     private MediaSessionManager manager;
     private MediaArtwork artwork;
     private boolean connected;
-    private final MediaSessionManager.OnActiveSessionsChangedListener sessions=new MediaSessionManager.OnActiveSessionsChangedListener(){public void onActiveSessionsChanged(List<MediaController> list){replace(list);}};
+    private final MediaSessionManager.OnActiveSessionsChangedListener sessions=new MediaSessionManager.OnActiveSessionsChangedListener(){public void onActiveSessionsChanged(List<MediaController> list){final List<MediaController> copy=list==null?null:new ArrayList<>(list);handler.post(()->replace(copy));}};
     private final Runnable poll=new Runnable(){public void run(){if(!connected)return;for(Track t:new ArrayList<>(tracks.values()))t.capture(false);handler.postDelayed(this,15000);}};
     @Override public void onListenerConnected(){
+        if(Looper.myLooper()!=Looper.getMainLooper()){handler.post(this::connectListener);return;}connectListener();
+    }
+    private void connectListener(){
         if(connected)return;
+        if(GenericMediaHistory.lowRamListenerUnsupported(this))return;
         connected=true;active=true;artwork=new MediaArtwork(this);manager=(MediaSessionManager)getSystemService(MEDIA_SESSION_SERVICE);
-        try{manager.addOnActiveSessionsChangedListener(sessions,new ComponentName(this,MediaHistoryService.class),handler);replace(manager.getActiveSessions(new ComponentName(this,MediaHistoryService.class)));handler.removeCallbacks(poll);handler.postDelayed(poll,15000);}catch(Exception e){disconnect();}
+        try{if(manager==null)throw new IllegalStateException("Media session manager unavailable");manager.addOnActiveSessionsChangedListener(sessions,new ComponentName(this,MediaHistoryService.class),handler);replace(manager.getActiveSessions(new ComponentName(this,MediaHistoryService.class)));handler.removeCallbacks(poll);handler.postDelayed(poll,15000);}catch(Exception e){disconnect();}
     }
     private void replace(List<MediaController> list){
         if(!connected)return;HashSet<MediaSession.Token> retained=new HashSet<>();
@@ -28,7 +32,7 @@ public final class MediaHistoryService extends NotificationListenerService {
         boolean removed=false;for(MediaSession.Token token:new ArrayList<>(tracks.keySet()))if(!retained.contains(token)){Track t=tracks.remove(token);t.capture(true);t.release();removed=true;}if(removed)GenericMediaHistory.changed(this);
     }
     private void disconnect(){connected=false;active=false;handler.removeCallbacksAndMessages(null);for(Track t:tracks.values())t.release();tracks.clear();if(manager!=null)try{manager.removeOnActiveSessionsChangedListener(sessions);}catch(Exception ignored){}if(artwork!=null)artwork.dispose();artwork=null;}
-    @Override public void onListenerDisconnected(){disconnect();}
+    @Override public void onListenerDisconnected(){if(Looper.myLooper()!=Looper.getMainLooper())handler.post(this::disconnect);else disconnect();}
     @Override public void onDestroy(){disconnect();super.onDestroy();}
     // Deliberately do not implement onNotificationPosted/onNotificationRemoved.
     private final class Track {
@@ -41,7 +45,7 @@ public final class MediaHistoryService extends NotificationListenerService {
         final MediaController.Callback callback=new MediaController.Callback(){
             @Override public void onMetadataChanged(MediaMetadata metadata){lastArt="";schedule();}
             @Override public void onPlaybackStateChanged(PlaybackState state){schedule();}
-            @Override public void onSessionDestroyed(){capture(true);release();tracks.remove(controller.getSessionToken());GenericMediaHistory.changed(MediaHistoryService.this);}
+            @Override public void onSessionDestroyed(){handler.post(()->{capture(true);release();tracks.remove(controller.getSessionToken());GenericMediaHistory.changed(MediaHistoryService.this);});}
         };
         Track(MediaController c){controller=c;}
         void schedule(){handler.removeCallbacks(deferred);handler.postDelayed(deferred,300);}
@@ -62,7 +66,7 @@ public final class MediaHistoryService extends NotificationListenerService {
                 if(!changed&&record.position==lastPosition&&mode==previousState&&elapsed-lastWrite<60000){if(artwork!=null&&!lastArt.equals(record.key())&&artwork.capture(record,controller.getMetadata()))lastArt=record.key();return;}
                 previousState=mode;lastPosition=record.position;lastWrite=elapsed;
                 if(store.put(record)){
-                    sendBroadcast(new Intent(HistoryStore.CHANGED).setPackage(getPackageName()));
+                    GenericMediaHistory.changed(MediaHistoryService.this);
                     if(artwork!=null&&!lastArt.equals(record.key())&&artwork.capture(record,controller.getMetadata()))lastArt=record.key();
                 }
             }catch(Exception e){android.util.Log.w("QuietTVMedia","Session metadata unavailable: "+e.getClass().getSimpleName());}

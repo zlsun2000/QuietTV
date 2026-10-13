@@ -21,6 +21,8 @@ final class SystemEntrypoints {
     static Intent inputSettings(Context c){return first(c,new Intent("android.settings.TV_INPUT_SETTINGS"));}
     static Intent homeSettings(Context c){return first(c,new Intent(Settings.ACTION_HOME_SETTINGS));}
     static Intent accessibilitySettings(Context c){return first(c,new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));}
+    static Intent notificationAccessSettings(Context c){return first(c,new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));}
+    static Intent appInfo(Context c,String pkg){if(!MediaRecordPolicy.packageName(pkg))return null;return first(c,new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.fromParts("package",pkg,null)));}
     static boolean defaultHome(Context c){try{ResolveInfo r=c.getPackageManager().resolveActivity(homeQuery(),PackageManager.MATCH_DEFAULT_ONLY);return r!=null&&r.activityInfo!=null&&c.getPackageName().equals(r.activityInfo.packageName);}catch(Exception e){return false;}}
     static ArrayList<ResolveInfo> otherHomes(Context c){
         ArrayList<ResolveInfo> result=new ArrayList<>();HashSet<String> seen=new HashSet<>();

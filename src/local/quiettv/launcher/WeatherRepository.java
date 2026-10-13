@@ -15,7 +15,7 @@ import java.util.concurrent.Executors;
 /** Cached city weather; refreshes only while the launcher is visible. */
 final class WeatherRepository {
     interface Changed {void changed();}
-    interface Cities {void found(ArrayList<Place> places);}
+    interface Cities {void found(ArrayList<Place> places,String error);}
     static final int TERMS_VERSION=20261011;
     static final long FRESH_MS=30*60*1000L;
     static final class Place {
@@ -36,7 +36,7 @@ final class WeatherRepository {
     private Data data;
     private boolean active,busy,disposed;
     private int generation;
-    private long retryAt;
+    private long retryAt,lastForceAt,lastSearchAt;
     private String message="正在获取天气…";
     private final Runnable timer=new Runnable(){public void run(){refresh(false);}};
     WeatherRepository(Context c,Changed callback){prefs=c.getSharedPreferences("weather",Context.MODE_PRIVATE);changed=callback;if(!prefs.getString("place","").isEmpty())try{data=read(new JSONObject(prefs.getString("cache","{}")));}catch(Exception ignored){}if(data==null)message="天气待更新";}
@@ -50,42 +50,43 @@ final class WeatherRepository {
     void start(){if(disposed)return;active=true;refresh(false);}
     void stop(){active=false;main.removeCallbacks(timer);}
     void dispose(){disposed=true;stop();worker.shutdownNow();}
-    void select(Place p){if(!valid(p))return;try{generation++;busy=false;data=null;retryAt=0;prefs.edit().putString("place",p.json().toString()).remove("cache").apply();message="正在获取"+p.name+"天气…";changed.changed();refresh(true);}catch(Exception ignored){}}
+    void select(Place p){if(!valid(p))return;try{generation++;busy=false;data=null;retryAt=0;lastForceAt=0;prefs.edit().putString("place",p.json().toString()).remove("cache").apply();message="正在获取"+p.name+"天气…";changed.changed();refresh(true);}catch(Exception ignored){}}
     void refresh(boolean force){
         if(disposed||!active||!enabled()||busy)return;
         if(prefs.getString("place","").isEmpty()){message="点击选择天气城市";changed.changed();return;}
-        long now=System.currentTimeMillis();main.removeCallbacks(timer);
+        long now=System.currentTimeMillis();main.removeCallbacks(timer);if(force&&now-lastForceAt<60000){message="请稍后再刷新";changed.changed();return;}if(force)lastForceAt=now;
         if(!force&&data!=null&&now>=data.updated&&now-data.updated<FRESH_MS){main.postDelayed(timer,FRESH_MS-(now-data.updated));return;}
         if(!force&&now<retryAt){main.postDelayed(timer,retryAt-now);return;}
         final int request=generation;busy=true;message="正在更新天气…";changed.changed();
         final String manualPlace=prefs.getString("place","");
         worker.execute(new Runnable(){public void run(){
-            Data result=null;
+            Data result=null;String failure="";
             try {
                 Place p=manualPlace.isEmpty()?null:Place.read(new JSONObject(manualPlace));
                 boolean manual=p!=null;
                 if(!valid(p))throw new java.io.IOException("Location unavailable");
                 result=forecast(p,manual);
-            } catch(Exception ignored){}
-            final Data fetched=result;
+            } catch(Exception error){failure=errorMessage(error);}
+            final Data fetched=result;final String requestError=failure;
             main.post(new Runnable(){public void run(){
                 if(disposed||request!=generation)return;busy=false;
                 if(fetched!=null){data=fetched;message="";retryAt=0;try{prefs.edit().putString("cache",json(fetched).toString()).apply();}catch(Exception ignored){}}
-                else {message=data==null?"天气暂不可用，点击选择城市":"更新失败，显示上次天气";retryAt=System.currentTimeMillis()+5*60*1000L;}
+                else {message=data==null?requestError:"更新失败，显示上次天气 · "+requestError;retryAt=System.currentTimeMillis()+5*60*1000L;}
                 if(active){changed.changed();main.postDelayed(timer,fetched!=null?FRESH_MS:5*60*1000L);}
             }});
         }});
     }
     void search(final String query,final Cities callback){
         if(disposed||!consented())return;
+        long now=System.currentTimeMillis();if(now-lastSearchAt<5000){callback.found(new ArrayList<Place>(),"搜索过于频繁，请稍后再试");return;}lastSearchAt=now;
         worker.execute(new Runnable(){public void run(){
-            final ArrayList<Place> places=new ArrayList<>();
+            final ArrayList<Place> places=new ArrayList<>();String failure="";
             try {
                 JSONObject j=JsonHttp.get("https://geocoding-api.open-meteo.com/v1/search?name="+URLEncoder.encode(query,"UTF-8")+"&count=6&language=zh&format=json");
                 JSONArray a=j.optJSONArray("results");
                 if(a!=null)for(int i=0;i<a.length();i++){JSONObject o=a.getJSONObject(i);Place p=new Place();p.name=o.optString("name");p.area=o.optString("admin1");p.country=o.optString("country");p.zone=o.optString("timezone","auto");p.latitude=o.optDouble("latitude",Double.NaN);p.longitude=o.optDouble("longitude",Double.NaN);if(valid(p))places.add(p);}
-            } catch(Exception ignored){}
-            main.post(new Runnable(){public void run(){if(!disposed&&active)callback.found(places);}});
+            } catch(Exception error){failure=errorMessage(error);}
+            final String requestError=failure;main.post(new Runnable(){public void run(){if(!disposed&&active)callback.found(places,requestError);}});
         }});
     }
     private static Data forecast(Place p,boolean manual) throws Exception {
@@ -98,6 +99,8 @@ final class WeatherRepository {
     }
     static String condition(int code){if(code==0)return "晴";if(code==1)return "晴间多云";if(code==2)return "多云";if(code==3)return "阴";if(code==45||code==48)return "雾";if(code>=51&&code<=57)return "毛毛雨";if(code>=61&&code<=67)return "雨";if(code>=71&&code<=77)return "雪";if(code>=80&&code<=82)return "阵雨";if(code==85||code==86)return "阵雪";if(code>=95&&code<=99)return "雷雨";return "天气";}
     static String degrees(double n){return Math.round(n)+"°";}
+    static String dayLabel(Data data,Day day,long now){try{java.util.TimeZone zone=java.util.TimeZone.getTimeZone(data.place.zone);java.text.SimpleDateFormat format=new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US);format.setTimeZone(zone);String today=format.format(new java.util.Date(now));java.text.SimpleDateFormat utc=new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US);utc.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));long current=utc.parse(today).getTime(),target=utc.parse(day.date).getTime();long offset=Math.round((target-current)/86400000.0);if(offset==0)return "今天";if(offset==1)return "明天";if(offset==2)return "后天";return day.date.length()>=10?day.date.substring(5):day.date;}catch(Exception ignored){return day.date;}}
+    static String errorMessage(Throwable error){while(error.getCause()!=null)error=error.getCause();if(error instanceof java.net.UnknownHostException)return "网络或 DNS 不可用";if(error instanceof java.net.SocketTimeoutException)return "天气服务响应超时";if(error instanceof JsonHttp.HttpStatusException){int status=((JsonHttp.HttpStatusException)error).status;return status==429?"天气服务暂时限流":status>=500?"天气服务暂不可用":"天气服务拒绝了请求";}if(error instanceof javax.net.ssl.SSLException)return "安全连接失败，请检查系统日期与网络";if(error instanceof org.json.JSONException)return "天气服务返回了无法识别的数据";return "天气暂不可用，请检查网络";}
     static boolean finite(double value){return !Double.isNaN(value)&&!Double.isInfinite(value);}
     static boolean valid(Place p){return p!=null&&!p.name.isEmpty()&&p.name.length()<100&&finite(p.latitude)&&finite(p.longitude)&&Math.abs(p.latitude)<=90&&Math.abs(p.longitude)<=180;}
     private static JSONObject json(Data d) throws Exception {JSONObject j=new JSONObject();j.put("place",d.place.json());j.put("temperature",d.temperature);j.put("code",d.code);j.put("updated",d.updated);j.put("manual",d.manual);JSONArray a=new JSONArray();for(Day day:d.days){JSONObject o=new JSONObject();o.put("date",day.date);o.put("low",day.low);o.put("high",day.high);o.put("code",day.code);a.put(o);}j.put("days",a);return j;}

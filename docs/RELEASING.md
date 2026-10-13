@@ -2,7 +2,7 @@
 
 官方 APK 使用维护者本地保存的固定密钥。此密钥未纳入仓库和 CI；开发者、Fork 与模拟器使用自己的密钥。不要将 CI 的临时签名 APK 上传成官方稳定版。
 
-1. 选择版本，递增 manifest versionCode，更新 versionName、CHANGELOG、安装说明和 Release notes。当前 0.12.0 的 code 为 20；之前本地回退使用 19。随后升级必须高于所有已发布覆盖版本。
+1. 选择版本，递增 manifest versionCode，更新 versionName、CHANGELOG、安装说明和 Release notes。当前公开版 0.13.0 的 code 为 21；此前 0.12.0 的 code 为 20，本地回退包使用 19。随后升级必须高于所有已发布覆盖版本。
 2. 完成 [法律与来源审查](LEGAL-REVIEW.md)、源码与隐私审查：查看 Git 历史、公开路径与媒体来源，排除凭据、用户数据、截图及第三方 APK。运行 `python tools/check-release.py --apk QuietTV.apk`；未厘清内容须移除后重建，不能只在说明中免责。
 3. 在干净检出构建，运行核心检查、CI 模拟器和适当的实机验证。按 COMPATIBILITY.md 分别记录证据；没有验证的机型/应用保留“待实测”。不会只因测试环境通过就声明全品牌兼容。
 4. 用固定私钥构建官方 APK，运行 apksigner verify --verbose --print-certs；记录公开证书 SHA-256。把同名版本 APK、SHA256SUMS.txt 和 release-info.json 放在本地 release/（不进入 Git）。release-info 包含版本/code、Git commit、文件 SHA-256、签名证书指纹、检查结果与兼容边界；不包含设备个人数据。

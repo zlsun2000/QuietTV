@@ -9,13 +9,14 @@ final class PlaybackRecord {
     String videoId="",episodeId="",title="",episode="",cover="",command="";
     long position,duration,updated,metadataAt,startedAt;
     boolean positionKnown=true;
-    boolean bili(){return PACKAGE.equals(source);}
+    /** Only records received over the verified TCL protocol use the TCL route. */
+    boolean bili(){return PACKAGE.equals(source)&&command.matches("tcl/(ugc|pgc|pugc)");}
     boolean apple(){return MUSIC_PACKAGE.equals(source)&&!command.equals("media/session");}
     boolean generic(){return !bili()&&!apple();}
     boolean music(){return apple()||(generic()&&audio);}
     String service(){return apple()?"Apple Music":bili()?"B 站":sourceLabel.isEmpty()?source:sourceLabel;}
     String key(){return apple()?"applemusic|"+videoId:generic()?"generic|"+source+"|"+videoId:command+"|"+videoId+"|"+episodeId;}
-    boolean valid(){return !title.isEmpty()&&title.length()<=240&&(apple()?musicId(videoId):bili()?numeric(videoId)&&command.matches("tcl/(ugc|pgc|pugc)")&&(episodeId.isEmpty()||numeric(episodeId)):MediaRecordPolicy.packageName(source)&&sourceLabel.length()<=160&&episode.length()<=160&&album.length()<=160&&videoId.matches("[a-f0-9]{64}")&&(contentId.isEmpty()||contentId.matches("[a-f0-9]{64}"))&&(command.equals("media/session")||(command.equals("media/qiyi")&&QiyiRoute.valid(this))));}
+    boolean valid(){return !title.isEmpty()&&title.length()<=240&&(apple()?musicId(videoId):bili()?numeric(videoId)&&(episodeId.isEmpty()||numeric(episodeId)):MediaRecordPolicy.packageName(source)&&sourceLabel.length()<=160&&episode.length()<=160&&album.length()<=160&&videoId.matches("[a-f0-9]{64}")&&(contentId.isEmpty()||contentId.matches("[a-f0-9]{64}"))&&(command.equals("media/session")||(command.equals("media/qiyi")&&QiyiRoute.valid(this))));}
     boolean canResume(){return valid()&&bili()&&!episodeId.isEmpty();}
     String actionLabel(){return apple()?"打开应用":canResume()?"继续播放":generic()&&!command.equals("media/qiyi")?"打开应用":"打开内容";}
     void inheritMetadata(PlaybackRecord old){if(!key().equals(old.key()))return;if(bili()&&old.metadataAt>0&&old.metadataAt>=metadataAt){episode=old.episode;if(!old.cover.isEmpty())cover=old.cover;}else{if(episode.isEmpty())episode=old.episode;if(cover.isEmpty())cover=old.cover;}if(generic()){if(!positionKnown&&old.positionKnown){position=old.position;positionKnown=true;}if(duration==0)duration=old.duration;}metadataAt=Math.max(metadataAt,old.metadataAt);}

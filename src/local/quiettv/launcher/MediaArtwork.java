@@ -28,9 +28,9 @@ final class MediaArtwork {
         final Bitmap bitmap=art;final String uri=MediaRecordPolicy.text(address,1500);if(bitmap==null&&uri.isEmpty())return false;
         final String ref="localart:"+MediaRecordPolicy.digest(record.key());final File target=file(app,ref);pending++;
         worker.execute(new Runnable(){public void run(){boolean saved=false;Bitmap image=null;try{
-            if(target.isFile())saved=true;else{
+            {
                 image=bitmap;if(image==null)image=read(uri,record.source);if(image==null||image.isRecycled()||image.getWidth()<1||image.getHeight()<1)throw new IOException("No artwork");
-                float scale=Math.min(1f,640f/Math.max(image.getWidth(),image.getHeight()));Bitmap output=Bitmap.createScaledBitmap(image,Math.max(1,(int)(image.getWidth()*scale)),Math.max(1,(int)(image.getHeight()*scale)),true);File temp=new File(target.getPath()+".tmp");try{try(FileOutputStream out=new FileOutputStream(temp)){if(!output.compress(Bitmap.CompressFormat.JPEG,88,out))throw new IOException("Cannot encode artwork");}saved=temp.renameTo(target);}finally{temp.delete();if(output!=image)output.recycle();}trim();
+                float scale=Math.min(1f,640f/Math.max(image.getWidth(),image.getHeight()));Bitmap output=Bitmap.createScaledBitmap(image,Math.max(1,(int)(image.getWidth()*scale)),Math.max(1,(int)(image.getHeight()*scale)),true);File temp=new File(target.getPath()+".tmp");try{try(FileOutputStream out=new FileOutputStream(temp)){if(!output.compress(Bitmap.CompressFormat.JPEG,88,out))throw new IOException("Cannot encode artwork");}if(target.exists()&&!target.delete())throw new IOException("Cannot replace artwork");saved=temp.renameTo(target);}finally{temp.delete();if(output!=image)output.recycle();}trim();
             }
         }catch(Exception e){android.util.Log.w("QuietTVMedia","Artwork unavailable: "+e.getClass().getSimpleName());}finally{if(image!=null&&image!=bitmap&&!image.isRecycled())image.recycle();}
         final boolean success=saved;main.post(new Runnable(){public void run(){pending--;if(!disposed&&success&&new HistoryStore(app).patchCover(record.key(),ref))GenericMediaHistory.changed(app);}});
@@ -38,7 +38,7 @@ final class MediaArtwork {
     }
     private Bitmap read(String text,String pkg) throws Exception {
         Uri uri=Uri.parse(text);InputStream input;
-        if("content".equals(uri.getScheme())){android.content.pm.ProviderInfo provider=app.getPackageManager().resolveContentProvider(uri.getAuthority(),0);if(provider==null||!pkg.equals(provider.packageName)||!provider.exported)return null;input=app.getContentResolver().openInputStream(uri);}
+        if("content".equals(uri.getScheme())){android.content.pm.ProviderInfo provider=app.getPackageManager().resolveContentProvider(uri.getAuthority(),0);boolean granted=app.checkUriPermission(uri,android.os.Process.myPid(),android.os.Process.myUid(),Intent.FLAG_GRANT_READ_URI_PERMISSION)==android.content.pm.PackageManager.PERMISSION_GRANTED;if(provider==null||!pkg.equals(provider.packageName)||(!provider.exported&&!granted))return null;input=app.getContentResolver().openInputStream(uri);}
         else return null;
         try(InputStream in=input;ByteArrayOutputStream out=new ByteArrayOutputStream()){if(in==null)return null;byte[] data=new byte[4096];int count;while((count=in.read(data))!=-1){if(out.size()+count>2097152)throw new IOException("Artwork too large");out.write(data,0,count);}byte[] bytes=out.toByteArray();BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);if(options.outWidth<=0||options.outHeight<=0||options.outWidth>8192||options.outHeight>8192)return null;options.inSampleSize=1;while(options.outWidth/options.inSampleSize>640||options.outHeight/options.inSampleSize>640)options.inSampleSize*=2;options.inJustDecodeBounds=false;return BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);}
     }

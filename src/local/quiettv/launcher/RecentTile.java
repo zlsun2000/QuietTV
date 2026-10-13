@@ -13,7 +13,8 @@ final class RecentTile extends View {
     private final Path path=new Path();
     private final Runnable coverReady=new Runnable(){public void run(){invalidate();}};
     private android.graphics.drawable.Drawable appIcon;
-    RecentTile(MainActivity a,PlaybackRecord r,Covers cache){super(a);host=a;record=r;covers=cache;if(r.generic())try{appIcon=a.getPackageManager().getApplicationIcon(r.source);}catch(Exception ignored){}setTag("recent|"+r.key());setFocusableInTouchMode(true);setClickable(true);setContentDescription(r.title+"，"+r.details()+"，"+r.actionLabel());setOnFocusChangeListener(new OnFocusChangeListener(){public void onFocusChange(View v,boolean f){host.focusChanged(v,f);}});}
+    RecentTile(MainActivity a,PlaybackRecord r,Covers cache){super(a);host=a;record=r;covers=cache;if(r.generic())try{appIcon=a.getPackageManager().getApplicationIcon(r.source);}catch(Exception ignored){}setTag("recent|"+r.key());setFocusableInTouchMode(true);setClickable(true);updateDescription();setOnFocusChangeListener(new OnFocusChangeListener(){public void onFocusChange(View v,boolean f){host.focusChanged(v,f);}});}
+    void updateDescription(){setContentDescription(record.title+"，"+record.details()+"，"+host.recordAction(record));}
     @Override protected void onDraw(Canvas c){
         float w=getWidth(),h=getHeight();RectF frame=new RectF(host.dp(3),host.dp(3),w-host.dp(3),h-host.dp(48));float radius=host.dp(12);
         p.setShader(new LinearGradient(0,0,w,frame.bottom,record.music()?new int[]{0xff52304b,0xff192135}:new int[]{0xff365569,0xff142536},null,Shader.TileMode.CLAMP));c.drawRoundRect(frame,radius,radius,p);p.setShader(null);

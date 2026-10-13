@@ -5,6 +5,22 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
+    <permission android:name="local.quiettv.launcher.permission.INTERNAL" android:protectionLevel="signature" />
+    <uses-permission android:name="local.quiettv.launcher.permission.INTERNAL" />
+    <queries>
+        <package android:name="com.tcl.tv" />
+        <package android:name="com.tcl.settings" />
+        <package android:name="com.tcl.qiyiguo" />
+        <package android:name="com.xiaodianshi.tv.yst" />
+        <package android:name="com.applemusicktv" />
+        <intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LEANBACK_LAUNCHER" /></intent>
+        <intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent>
+        <intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.HOME" /></intent>
+        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="content" /></intent>
+        <intent><action android:name="android.settings.SETTINGS" /></intent>
+        <intent><action android:name="android.settings.ACCESSIBILITY_SETTINGS" /></intent>
+        <intent><action android:name="android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS" /></intent>
+    </queries>
     <application android:label="静幕" android:icon="@drawable/icon" android:banner="@drawable/banner" android:allowBackup="false" android:theme="@android:style/Theme.Material.NoActionBar" android:supportsRtl="true">
         <service android:name=".MediaHistoryService" android:label="静幕 · 播放记录" android:exported="true" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>

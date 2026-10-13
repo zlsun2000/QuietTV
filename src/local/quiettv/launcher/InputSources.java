@@ -5,28 +5,51 @@ import android.content.Intent;
 import android.content.ComponentName;
 import android.media.tv.*;
 import android.os.Build;
+import android.os.Handler;
 import java.util.*;
 import java.lang.reflect.*;
 import java.io.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Reads TCL input metadata only; switching is delegated to the exported TV activity. */
 final class InputSources {
+    interface ScanCallback {void complete(ArrayList<Port> ports);}
     static final class Port {
         int id,number,state=-1; String name,device="",enumName,inputId=""; Object source;Intent intent;
         String key(){return "input:"+(inputId.isEmpty()?String.valueOf(id):inputId);}
     }
     private final Context context;
+    private final Handler main=new Handler(android.os.Looper.getMainLooper());
+    private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private final AtomicBoolean scanPending=new AtomicBoolean();
+    private final AtomicBoolean scanAgain=new AtomicBoolean();
+    private TvInputManager tvInputManager;
+    private TvInputManager.TvInputCallback tvInputCallback;
     private Class<?> sourceClass;
     private Object common,properties;
     private final StringBuilder diagnostics=new StringBuilder();
     InputSources(Context c){context=c.getApplicationContext();}
+    void observe(ScanCallback callback){
+        try{tvInputManager=(TvInputManager)context.getSystemService(Context.TV_INPUT_SERVICE);if(tvInputManager==null)return;
+            tvInputCallback=new TvInputManager.TvInputCallback(){
+                @Override public void onInputAdded(String inputId){scanAsync(callback);}
+                @Override public void onInputRemoved(String inputId){scanAsync(callback);}
+                @Override public void onInputUpdated(String inputId){scanAsync(callback);}
+                @Override public void onInputStateChanged(String inputId,int state){scanAsync(callback);}
+            };tvInputManager.registerCallback(tvInputCallback,main);
+        }catch(Exception ignored){}
+    }
+    void scanAsync(final ScanCallback callback){if(!scanPending.compareAndSet(false,true)){scanAgain.set(true);return;}try{worker.execute(()->{final ArrayList<Port> result=scan();scanPending.set(false);main.post(()->callback.complete(result));if(scanAgain.getAndSet(false))scanAsync(callback);});}catch(Exception ignored){scanPending.set(false);scanAgain.set(false);}}
+    void dispose(){try{if(tvInputManager!=null&&tvInputCallback!=null)tvInputManager.unregisterCallback(tvInputCallback);}catch(Exception ignored){}worker.shutdownNow();}
     private Object call(Object target,String method,Class<?>[] types,Object...args) throws Exception {
         Method m=target.getClass().getMethod(method,types);m.setAccessible(true);return m.invoke(target,args);
     }
     private Object manager(String name) throws Exception {
         Class<?> cls=Class.forName(name);return cls.getMethod("getInstance",Context.class).invoke(null,context);
     }
-    ArrayList<Port> scan(){
+    synchronized ArrayList<Port> scan(){
         ArrayList<Port> result=new ArrayList<>();diagnostics.setLength(0);
         try{
             Intent tv=new Intent().setComponent(new ComponentName("com.tcl.tv","com.tcl.tv.TVActivity"));
@@ -53,12 +76,13 @@ final class InputSources {
             readDeviceNames(result);
             for(Port p:result)diagnostics.append(p.name).append(" id=").append(p.id).append(" state=").append(p.state).append(" device=").append(p.device).append('\n');
         }catch(Throwable e){diagnostics.append("Initialization: ").append(error(e)).append('\n');}
-        writeDiagnostics();return result.isEmpty()?standardInputs():result;
+        return result.isEmpty()?standardInputs():result;
     }
     private ArrayList<Port> standardInputs(){
         ArrayList<Port> result=new ArrayList<>();
         try{TvInputManager manager=(TvInputManager)context.getSystemService(Context.TV_INPUT_SERVICE);if(manager==null)return result;
             for(TvInputInfo info:manager.getTvInputList()){
+                try{
                 // A registered input is usable here only when a TV player can handle its URI.
                 if(!info.isPassthroughInput())continue;
                 Intent view=new Intent(Intent.ACTION_VIEW,TvContract.buildChannelUriForPassthroughInput(info.getId()));
@@ -69,6 +93,7 @@ final class InputSources {
                 // Public TvInputInfo does not guarantee a CEC device name or physical port number.
                 // Keep them unknown rather than depending on a hidden system API.
                 p.intent=view.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);result.add(p);
+                }catch(Exception e){diagnostics.append("input item: ").append(error(e)).append('\n');}
             }
         }catch(Exception ignored){}return result;
     }
