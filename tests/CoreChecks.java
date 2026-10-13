@@ -5,7 +5,45 @@ public final class CoreChecks {
     private static int checks;
     private static void check(boolean condition,String description){checks++;if(!condition)throw new AssertionError(description);}
     private static PlaybackRecord record(){PlaybackRecord r=new PlaybackRecord();r.videoId="123456";r.episodeId="789";r.command="tcl/ugc";r.title="Example";return r;}
+    private static InputSources.Port port(String id,String parent,String label){InputSources.Port p=new InputSources.Port();p.inputId=id;p.parentId=parent;p.baseLabel=p.name=label;p.enumName="ANDROID_HDMI";p.sortNumber=InputSources.labelNumber(label);return p;}
+    private static void inputChecks(){
+        check(InputSources.standardState(0)==InputSources.CONNECTED&&InputSources.standardState(1)==InputSources.STANDBY&&InputSources.standardState(2)==InputSources.DISCONNECTED,"all three standard input states have distinct meanings");
+        check(InputSources.standardState(99)==InputSources.UNKNOWN,"future or invalid input states remain unknown");
+        check(InputSources.insertedState(Boolean.TRUE)==InputSources.CONNECTED&&InputSources.insertedState(Boolean.FALSE)==InputSources.DISCONNECTED,"OEM boolean status is normalized");
+        check(InputSources.insertedState(1)==InputSources.UNKNOWN&&InputSources.insertedState(null)==InputSources.UNKNOWN,"nonboolean OEM results cannot invent a disconnection");
+        check(InputSources.labelNumber("HDMI 2 (ARC)")==2&&InputSources.labelNumber("hdmi-10")==10,"numeric ordering accepts common system HDMI labels");
+        check(InputSources.labelNumber("HDMI200004")==0&&InputSources.labelNumber("HW16")==0&&InputSources.labelNumber("Input 5")==0,"hardware and CEC IDs and custom names do not define port numbers");
+        check(InputSources.labelNumber(null)==0&&InputSources.labelNumber("TV HDMI 4")==0&&InputSources.labelNumber("HDMI0")==0,"missing and ambiguous labels stay unnumbered");
+        InputSources.Port one=port("brand.a/input1","","HDMI 1"),two=port("brand.a/input2","","HDMI2"),three=port("brand.a/input3","","HDMI 3"),ten=port("brand.a/input10","","HDMI 10");
+        two.name="Input 5";java.util.ArrayList<InputSources.Port> sorted=InputSources.groupInputs(java.util.Arrays.asList(ten,three,two,one));
+        check(sorted.equals(java.util.Arrays.asList(one,two,three,ten)),"default HDMI order uses original labels and numbers despite custom names");
+        check(two.number==0,"display ordering never invents a physical port number");
+        InputSources.Port child=port("brand.a/cec-game",two.inputId,"Game console");two.state=InputSources.STANDBY;
+        java.util.ArrayList<InputSources.Port> grouped=InputSources.groupInputs(java.util.Arrays.asList(child,one,two));
+        check(grouped.size()==2&&grouped.get(1)==two,"explicit CEC parent relationship removes only the duplicate card");
+        check(two.children.size()==1&&two.children.get(0)==child&&two.children.get(0).name.equals("Game console"),"child metadata is retained on the physical card");
+        check(two.name.equals("Input 5")&&two.state==InputSources.STANDBY,"grouping preserves the parent's custom name and reported state");
+        InputSources.Port second=port("brand.a/cec-player",two.inputId,"Player");grouped=InputSources.groupInputs(java.util.Arrays.asList(second,child,two));
+        check(grouped.size()==1&&two.children.size()==2&&two.children.contains(second)&&two.children.contains(child),"multiple devices on an AVR retain their individual routes in one group");
+        InputSources.Port orphan=port("brand.b/cec","missing-parent","Game console"),lookalike=port("brand.b/port","","Game console");
+        check(InputSources.groupInputs(java.util.Arrays.asList(orphan,lookalike)).size()==2,"similar names cannot merge inputs when the parent is missing");
+        InputSources.Port cycleA=port("cycle-a","cycle-b","HDMI 1"),cycleB=port("cycle-b","cycle-a","HDMI 2");
+        check(InputSources.groupInputs(java.util.Arrays.asList(cycleA,cycleB)).size()==2,"cyclic firmware relationships cannot discard all inputs");
+        InputSources.Port other=port("non-hdmi","","AV"),wrongChild=port("child",other.inputId,"Game console");other.enumName="ANDROID_INPUT";
+        check(InputSources.groupInputs(java.util.Arrays.asList(other,wrongChild)).size()==2,"non-HDMI parents are not guessed to be HDMI ports");
+        java.util.Map<String,String> aliases=InputSources.aliases(grouped);
+        check(two.key().equals(aliases.get(child.key()))&&two.key().equals(aliases.get(second.key())),"all grouped routes reference the stable physical card");
+        java.util.List<String> old=java.util.Arrays.asList("other-app",child.key(),"stale-input",two.key(),second.key());
+        java.util.ArrayList<String> mapped=InputSources.remapKeys(old,aliases);
+        check(mapped.equals(java.util.Arrays.asList("other-app",two.key(),"stale-input")),"manual order keeps the first equivalent position and all unrelated stale entries");
+        check(InputSources.remapKeys(mapped,aliases).equals(mapped),"input preference migration is idempotent");
+        check(InputSources.remapSelection("favorites|"+child.key(),aliases).equals("favorites|"+two.key()),"focus follows a grouped card in any category");
+        check(InputSources.remapSelection("",aliases).equals("")&&InputSources.remapSelection("all|other-app",aliases).equals("all|other-app"),"unrelated and empty focus keys are preserved");
+    }
     public static void main(String[] args){
+        inputChecks();
+        check(GenericMediaHistory.observationRank(null)<GenericMediaHistory.observationRank(0),"missing media states are distinct from idle sessions");
+        check(GenericMediaHistory.observationRank(3)>GenericMediaHistory.observationRank(2)&&GenericMediaHistory.observationRank(2)>GenericMediaHistory.observationRank(1),"multiple sessions prefer a real playing state over paused and stopped states");
         check(DevicePolicy.tclPorts("","","Unknown TV").isEmpty(),"unknown devices never inherit another television's ports");
         check(DevicePolicy.tclPorts("","","50F295C-JN").size()==4,"verified exact device profile retains its fallback");
         check(DevicePolicy.tclPorts("HDMI 3, DTV, AV2","HDMI1","Unknown").toString().equals("[HDMI3, DTV, AV2]"),"reported ports override fallback and legacy metadata");

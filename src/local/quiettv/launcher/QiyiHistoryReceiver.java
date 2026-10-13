@@ -7,6 +7,9 @@ import org.json.*;
 /** Uses the existing TCL history broadcasts of the installed Qiyi channel build. */
 public final class QiyiHistoryReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context,Intent intent){
+        if(LegacyHistoryListener.skipManifest(intent))return;receive(context,intent);
+    }
+    static void receive(Context context,Intent intent){
         if(intent==null)return;UserManager user=(UserManager)context.getSystemService(Context.USER_SERVICE);if(Build.VERSION.SDK_INT>=24&&user!=null&&!user.isUserUnlocked())return;
         try{
             Bundle extras=intent.getExtras();if(extras==null||!QiyiRoute.PACKAGE.equals(text(extras,"packageName",160)))return;

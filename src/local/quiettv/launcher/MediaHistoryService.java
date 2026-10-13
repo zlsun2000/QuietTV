@@ -15,6 +15,7 @@ public final class MediaHistoryService extends NotificationListenerService {
     private MediaSessionManager manager;
     private MediaArtwork artwork;
     private boolean connected;
+    private boolean legacyHistoryOwned;
     private final MediaSessionManager.OnActiveSessionsChangedListener sessions=new MediaSessionManager.OnActiveSessionsChangedListener(){public void onActiveSessionsChanged(List<MediaController> list){final List<MediaController> copy=list==null?null:new ArrayList<>(list);handler.post(()->replace(copy));}};
     private final Runnable poll=new Runnable(){public void run(){if(!connected)return;for(Track t:new ArrayList<>(tracks.values()))t.capture(false);handler.postDelayed(this,15000);}};
     @Override public void onListenerConnected(){
@@ -23,7 +24,7 @@ public final class MediaHistoryService extends NotificationListenerService {
     private void connectListener(){
         if(connected)return;
         if(GenericMediaHistory.lowRamListenerUnsupported(this))return;
-        connected=true;active=true;artwork=new MediaArtwork(this);manager=(MediaSessionManager)getSystemService(MEDIA_SESSION_SERVICE);
+        connected=true;active=true;legacyHistoryOwned=LegacyHistoryListener.acquire(this);artwork=new MediaArtwork(this);manager=(MediaSessionManager)getSystemService(MEDIA_SESSION_SERVICE);
         try{if(manager==null)throw new IllegalStateException("Media session manager unavailable");manager.addOnActiveSessionsChangedListener(sessions,new ComponentName(this,MediaHistoryService.class),handler);replace(manager.getActiveSessions(new ComponentName(this,MediaHistoryService.class)));handler.removeCallbacks(poll);handler.postDelayed(poll,15000);}catch(Exception e){disconnect();}
     }
     private void replace(List<MediaController> list){
@@ -31,7 +32,7 @@ public final class MediaHistoryService extends NotificationListenerService {
         if(list!=null)for(MediaController c:list){if(retained.size()>=16)break;if(!GenericMediaHistory.eligible(this,c.getPackageName()))continue;MediaSession.Token token=c.getSessionToken();retained.add(token);if(!tracks.containsKey(token)){Track t=new Track(c);tracks.put(token,t);c.registerCallback(t.callback,handler);t.capture(true);}}
         boolean removed=false;for(MediaSession.Token token:new ArrayList<>(tracks.keySet()))if(!retained.contains(token)){Track t=tracks.remove(token);t.capture(true);t.release();removed=true;}if(removed)GenericMediaHistory.changed(this);
     }
-    private void disconnect(){connected=false;active=false;handler.removeCallbacksAndMessages(null);for(Track t:tracks.values())t.release();tracks.clear();if(manager!=null)try{manager.removeOnActiveSessionsChangedListener(sessions);}catch(Exception ignored){}if(artwork!=null)artwork.dispose();artwork=null;}
+    private void disconnect(){connected=false;active=false;if(legacyHistoryOwned){LegacyHistoryListener.release();legacyHistoryOwned=false;}handler.removeCallbacksAndMessages(null);for(Track t:tracks.values())t.release();tracks.clear();if(manager!=null)try{manager.removeOnActiveSessionsChangedListener(sessions);}catch(Exception ignored){}if(artwork!=null)artwork.dispose();artwork=null;}
     @Override public void onListenerDisconnected(){if(Looper.myLooper()!=Looper.getMainLooper())handler.post(this::disconnect);else disconnect();}
     @Override public void onDestroy(){disconnect();super.onDestroy();}
     // Deliberately do not implement onNotificationPosted/onNotificationRemoved.

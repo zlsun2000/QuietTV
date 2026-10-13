@@ -30,10 +30,10 @@ final class HistoryStore {
         try{JSONArray a=new JSONArray(prefs.getString("records","[]"));for(int i=0;i<Math.min(8,a.length());i++){PlaybackRecord r=decode(a.getJSONObject(i));if(r.valid())list.add(r);}}catch(Exception ignored){}
         return list;
     }
-    ArrayList<PlaybackRecord> visible(){ArrayList<PlaybackRecord> result=new ArrayList<>();if(enabled())for(PlaybackRecord r:list())if((!r.apple()||musicEnabled())&&(!r.generic()||(genericEnabled()&&appEnabled(r.source)))&&sourceAvailable(r))result.add(r);return result;}
+    ArrayList<PlaybackRecord> visible(){ArrayList<PlaybackRecord> result=new ArrayList<>();if(enabled())for(PlaybackRecord r:list())if(appEnabled(r.source)&&(!r.apple()||musicEnabled())&&(!r.generic()||genericEnabled())&&sourceAvailable(r))result.add(r);return result;}
     private boolean sourceAvailable(PlaybackRecord record){try{return context.getPackageManager().getApplicationInfo(record.source,0).enabled;}catch(Exception ignored){return false;}}
     boolean put(PlaybackRecord record){
-        if(!enabled()||!record.valid()||(record.generic()&&(!genericEnabled()||!appEnabled(record.source))))return false;record.clamp();
+        if(!enabled()||!record.valid()||!appEnabled(record.source)||(record.generic()&&!genericEnabled()))return false;record.clamp();
         long removed=prefs.getLong("removed_"+record.key(),0),cleared=prefs.getLong("cleared_at",0);if((record.generic()?MediaRecordPolicy.suppressed(record.startedAt,record.updated,removed,cleared):record.updated<=cleared||removed>=record.updated)||removed>System.currentTimeMillis()-30000)return false;
         ArrayList<PlaybackRecord> records=list();
         for(int i=records.size()-1;i>=0;i--){PlaybackRecord old=records.get(i);if(old.key().equals(record.key())){record.inheritMetadata(old);records.remove(i);}else if(record.apple()&&old.apple())records.remove(i);}

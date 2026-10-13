@@ -1,3 +1,11 @@
+# 0.13.2-test
+
+- Group standard Android TV HDMI inputs by their explicit parent relationship to avoid duplicate port/device cards. Preserve custom labels and preferences; multiple devices on one port retain a selection menu. Orphaned inputs keep their own routes.
+- Order HDMI cards numerically using original system labels while retaining manual order. Distinguish connected, standby, disconnected and unavailable states; unavailable labels/status no longer discard a usable input.
+- Show a per-app snapshot of public media sessions separately from history permission. This helps diagnose missing history without assuming support from an installed app or a device brand. Bilibili 1.7.7 history remains unverified.
+- Receive existing channel history broadcasts at runtime on Android 8+ while the launcher or OS-bound media listener is alive, retaining validated manifest delivery for explicit broadcasts. Per-app blocking now also applies to legacy Bilibili records. This fixes a delivery gap; it does not create an interface in apps that expose none.
+- Local test build; no broad OEM compatibility claim.
+
 # 0.13.1-test
 
 - Local TV test build for the P1/P2/P3 compatibility improvements: more reliable Home and media status, responsive input-source updates, safer background import/video fallback, clearer capability reporting, and improved locale, font-scale, RTL, and accessibility support. This build is not a public release and does not establish broad OEM compatibility.

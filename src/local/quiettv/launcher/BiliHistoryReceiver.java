@@ -6,9 +6,12 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.UserManager;
 
-/** Receives the TCL history protocol already emitted by this TV's Bilibili build. */
+/** Receives an existing channel history protocol; not assumed to exist in every build. */
 public final class BiliHistoryReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context,Intent intent){
+        if(LegacyHistoryListener.skipManifest(intent))return;receive(context,intent);
+    }
+    static void receive(Context context,Intent intent){
         if(intent==null)return;
         UserManager users=(UserManager)context.getSystemService(Context.USER_SERVICE);
         if(android.os.Build.VERSION.SDK_INT>=24&&users!=null&&!users.isUserUnlocked())return;

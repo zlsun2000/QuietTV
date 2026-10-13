@@ -21,6 +21,19 @@ final class GenericMediaHistory {
     static DeviceCapability capability(Context c){if(lowRamListenerUnsupported(c))return DeviceCapability.unsupported("media_sessions","此低内存系统不支持媒体识别");if(!permission(c))return DeviceCapability.optional("media_sessions","未授权，可选");if(serviceConnected())return DeviceCapability.available("media_sessions","已授权 · 正在运行");return DeviceCapability.waiting("media_sessions","已授权 · 等待系统连接");}
     static String availability(Context c){return capability(c).reason;}
     static List<MediaController> sessions(Context c){if(!permission(c)||lowRamListenerUnsupported(c))return Collections.emptyList();try{MediaSessionManager manager=(MediaSessionManager)c.getSystemService(Context.MEDIA_SESSION_SERVICE);return manager==null?Collections.<MediaController>emptyList():manager.getActiveSessions(listener(c));}catch(Exception ignored){return Collections.emptyList();}}
+    // A snapshot for troubleshooting, not a permanent list of supported applications.
+    static int observationRank(Integer state){return state==null?1:state==PlaybackState.STATE_PLAYING?5:state==PlaybackState.STATE_PAUSED?4:state==PlaybackState.STATE_STOPPED?3:2;}
+    static Map<String,Integer> sessionObservations(Context c){
+        HashMap<String,Integer> result=new HashMap<>();for(MediaController controller:sessions(c))try{
+            String pkg=controller.getPackageName();if(!eligible(c,pkg))continue;
+            PlaybackState state=controller.getPlaybackState();int rank=observationRank(state==null?null:state.getState());
+            Integer old=result.get(pkg);if(old==null||rank>old)result.put(pkg,rank);
+        }catch(Exception ignored){}return result;
+    }
+    static String observation(Context c,String pkg,Map<String,Integer> observed,DeviceCapability capability){
+        if(!capability.isAvailable())return capability.reason;
+        Integer rank=observed.get(pkg);return c.getString(rank==null?R.string.media_session_absent:rank==1?R.string.media_session_no_state:rank==5?R.string.media_session_playing:rank==4?R.string.media_session_paused:rank==3?R.string.media_session_stopped:R.string.media_session_idle);
+    }
     static PlaybackRecord record(Context c,MediaController controller){
         String pkg=controller.getPackageName();if(!eligible(c,pkg))return null;MediaMetadata m=controller.getMetadata();PlaybackState state=controller.getPlaybackState();if(state==null)return null;if(m==null)m=new MediaMetadata.Builder().build();
         PlaybackRecord r=new PlaybackRecord();r.source=pkg;r.sourceLabel=label(c,pkg);r.command="media/session";

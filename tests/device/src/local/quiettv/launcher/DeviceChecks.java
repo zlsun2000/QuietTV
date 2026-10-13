@@ -26,11 +26,37 @@ public final class DeviceChecks extends Instrumentation {
     }
     private String resolvedHome(Context c){android.content.pm.ResolveInfo resolved=c.getPackageManager().resolveActivity(SystemEntrypoints.homeQuery(),android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);return resolved==null||resolved.activityInfo==null?"none":resolved.activityInfo.packageName+"/"+resolved.activityInfo.name;}
     private Object field(Object owner,String name)throws Exception{Field f=owner.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(owner);}
+    private void legacyDelivery(Context c)throws Exception{
+        final CountDownLatch received=new CountDownLatch(2);final int[] registrations={0},removals={0};
+        ContextWrapper probe=new ContextWrapper(c){
+            BroadcastReceiver wrapped;
+            @Override public Context getApplicationContext(){return this;}
+            @Override public Intent registerReceiver(final BroadcastReceiver receiver,IntentFilter filter){
+                registrations[0]++;wrapped=new BroadcastReceiver(){public void onReceive(Context context,Intent intent){received.countDown();receiver.onReceive(context,intent);}};
+                return super.registerReceiver(wrapped,filter);
+            }
+            @Override public void unregisterReceiver(BroadcastReceiver receiver){removals[0]++;super.unregisterReceiver(wrapped);}
+        };
+        boolean first=LegacyHistoryListener.acquire(probe),second=false;
+        if(Build.VERSION.SDK_INT<26){check(!first&&registrations[0]==0,"Android 6 retains manifest delivery without a duplicate runtime listener");return;}
+        try{
+            check(first,"Android 8+ can register the legacy history runtime listener");
+            second=LegacyHistoryListener.acquire(c);check(second&&registrations[0]==1,"Activity and bound-service owners share one registration");
+            Intent event=new Intent("com.tv.history.add");
+            check(LegacyHistoryListener.skipManifest(event)&&!LegacyHistoryListener.skipManifest(new Intent(event).setPackage(c.getPackageName()))&&!LegacyHistoryListener.skipManifest(new Intent(event).setComponent(new ComponentName(c,BiliHistoryReceiver.class))),"only implicit events defer manifest processing to the runtime listener");
+            // Empty synthetic events do not identify a provider or create history.
+            c.sendBroadcast(event);LegacyHistoryListener.release();first=false;
+            check(removals[0]==0,"releasing one owner does not remove the other owner's listener");
+            c.sendBroadcast(event);check(received.await(5,TimeUnit.SECONDS),"implicit history broadcasts reach the runtime listener while another owner remains");
+        }finally{if(first)LegacyHistoryListener.release();if(second)LegacyHistoryListener.release();}
+        check(removals[0]==1&&!LegacyHistoryListener.skipManifest(new Intent("com.tv.history.add")),"the last owner unregisters and restores manifest processing");
+    }
     @Override public void onStart(){Bundle result=new Bundle();try{
         // A hardware TV must never receive these synthetic upgrade preferences.
         boolean virtual=Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator");
         check(virtual,"only a synthetic emulator may run device checks");
         Context c=getTargetContext();SharedPreferences home=c.getSharedPreferences("home",0),history=c.getSharedPreferences("playback_history",0);
+        if("fresh".equals(phase))legacyDelivery(c);
         status("starting a new launcher Activity");
         ActivityMonitor monitor=addMonitor(MainActivity.class.getName(),null,false);
         c.startActivity(new Intent().setComponent(new ComponentName(c,MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
@@ -54,6 +80,10 @@ public final class DeviceChecks extends Instrumentation {
             weather.start();check(!weather.loading(),"service consent alone never forecasts a city the user has not selected");
             weather.dispose();weatherPrefs.edit().clear().commit();
             check(!GenericMediaHistory.permission(c),"basic desktop requires no media grant");
+            HistoryStore records=new HistoryStore(c);records.enabled(true);records.appEnabled(PlaybackRecord.PACKAGE,false);
+            PlaybackRecord legacy=new PlaybackRecord();legacy.videoId="123456";legacy.episodeId="789";legacy.command="tcl/ugc";legacy.title="Synthetic blocked legacy item";legacy.updated=System.currentTimeMillis();
+            check(!records.put(legacy)&&records.list().isEmpty(),"per-app blocking also rejects legacy channel history");
+            records.appEnabled(PlaybackRecord.PACKAGE,true);records.enabled(false);
             final boolean[] screen={false};runOnMainSync(()->{View root=activity.getWindow().getDecorView();screen[0]=root.getWidth()>0&&root.getHeight()>0&&root.hasWindowFocus()&&activity.getCurrentFocus()!=null;});check(screen[0],"launcher is the foreground window with a remote focus target");
             for(int key:new int[]{KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.KEYCODE_DPAD_UP})sendKeyDownUpSync(key);
             awaitFrames(activity);final boolean[] focus={false};runOnMainSync(()->{View v=activity.getCurrentFocus();Rect visible=new Rect();focus[0]=activity.getWindow().getDecorView().hasWindowFocus()&&v!=null&&v.getGlobalVisibleRect(visible)&&visible.width()>0&&visible.height()>0;});check(focus[0],"remote traversal retains visible foreground focus");
