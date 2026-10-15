@@ -1,8 +1,9 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.quiettv.launcher" android:versionCode="26" android:versionName="0.14.0-rc2">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.quiettv.launcher" android:versionCode="27" android:versionName="0.14.0-rc3">
     <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <permission android:name="local.quiettv.launcher.permission.INTERNAL" android:protectionLevel="signature" />

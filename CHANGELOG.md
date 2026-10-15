@@ -1,3 +1,7 @@
+# 0.14.0-rc3
+
+- Add an explicit, DUMP-protected TV-history diagnostic to distinguish missing TV-listings permission from empty Watch Next/preview results. Reads require the existing history opt-ins plus a separately granted READ_TV_LISTINGS permission, use a fixed system authority and package filter, and report bounded counts and public provider declarations only. It does not collect content into history, launch playback or establish Netflix resume support.
+
 # 0.14.0-rc2
 
 - Add a DUMP-permission-protected ADB rule-only import. It validates the bounded JSON file through the normal registry, keeps imports disabled and reports a fixed result without opening UI or restoring history, backgrounds or other preferences. Netflix content-route inspection alone does not establish a usable media ID or exact resume support.

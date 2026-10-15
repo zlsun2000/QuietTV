@@ -38,6 +38,8 @@
 
 ## 本地数据与迁移
 
+`TvHistoryInspection` 是显式 DUMP 维护请求触发的只读排查工具，独立检查 `READ_TV_LISTINGS` 授权及历史开关，只在固定系统提供者中按目标包查询有界 Watch Next/预览数据；保存脱敏计数，不自动采集历史或启动提供者给出的 Intent。它区分权限过滤和空结果，当前不属于 JSON 的新接入适配器。
+
 `home` preferences 保存收藏、分类顺序、主题、自定义背景路径和 Home 键修复开关；`playback_history` 保存 JSON 记录及开关；`playback_rules` 保存本地规则、前版和启用选择；`weather` 的具体键由 WeatherRepository 管理。用户媒体位于本应用 external-files / files，缓存可丢弃，配置不能在更新时重置。维护导出包含规则，导入有界校验并兼容不含规则的旧备份。
 
 0.12.0 为 home 与 playback_history 增加 `config_schema=1`。发现旧 preferences 时保留字段及旧默认行为；全新记录 preferences 明确默认关闭 enabled/music_enabled/generic_enabled。迁移没有删除旧键，未知播放字段仍由宽容 JSON 读取处理。后续迁移应逐级、幂等、先判断存在性，并测试升级保留配置。

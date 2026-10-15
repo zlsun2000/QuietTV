@@ -68,6 +68,7 @@ public final class RuleChecks extends Instrumentation {
         JSONObject session=copy(json).put("id","example.session").put("adapter","media_session");session.remove("event");session.getJSONObject("fields").getJSONObject("id").put("key","mediaId");session.getJSONObject("fields").getJSONObject("title").put("key","title");session.getJSONObject("fields").getJSONObject("position").put("key","position").put("unit","ms");session.getJSONObject("fields").getJSONObject("duration").put("key","duration").put("unit","ms");registry.install(registry.parse(session.toString()));registry.enabled(registry.find("example.session"),true);
         PlaybackRecord media=new PlaybackRecord();media.source=PKG;media.sourceLabel="Fixture";media.command="media/session";media.videoId=MediaRecordPolicy.digest("session");media.title="Synthetic session";media.position=123000;PlaybackRules.decorateSession(c,media,new MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_MEDIA_ID,"session-item").build());check(media.ruleId.equals("example.session")&&media.ruleData.get("id").equals("session-item")&&media.valid(),"standard media metadata can supply an optional persistent route rule");
         maintenanceChecks(c,registry);
+        inspectionChecks(c);
         result.putString("passed",count+" rule checks");finish(Activity.RESULT_OK,result);
     }catch(Throwable error){result.putString("failed",error.toString());finish(Activity.RESULT_CANCELED,result);}finally{if(owned)LegacyHistoryListener.release();}}
     private void builtinChecks(Context c,PlaybackRules registry)throws Exception {
@@ -95,4 +96,14 @@ public final class RuleChecks extends Instrumentation {
         }finally{if(file.isFile()&&!file.delete())throw new IOException("Cannot clean synthetic rule import");}
     }
     private static void save(File file,String value)throws Exception {try(Writer writer=new OutputStreamWriter(new FileOutputStream(file),"UTF-8")){writer.write(value);}}
+    private void inspectionChecks(Context c)throws Exception {
+        android.os.CancellationSignal cancel=new android.os.CancellationSignal();
+        check(TvHistoryInspection.inspect(c,"../../private",cancel).getString("status").equals("invalid_package"),"TV history diagnosis rejects path-like targets before querying");
+        check(TvHistoryInspection.inspect(c,c.getPackageName(),cancel).getString("status").equals("invalid_package"),"TV history diagnosis cannot inspect the launcher's own data");
+        check(TvHistoryInspection.inspect(c,"org.example.missing",cancel).getString("status").equals("target_missing"),"TV history diagnosis reports absent apps without inventing a source");
+        check(TvHistoryInspection.inspect(c,PKG,cancel).getString("status").equals("history_disabled"),"TV listing reads respect the user's history opt-out");
+        c.getSharedPreferences("playback_history",0).edit().putBoolean("generic_enabled",true).commit();
+        try{JSONObject report=TvHistoryInspection.inspect(c,PKG,cancel);check(report.getString("status").equals("read_permission_required")&&!report.has("watchNext"),"missing TV-listings permission is distinct from an empty provider result");}
+        finally{c.getSharedPreferences("playback_history",0).edit().putBoolean("generic_enabled",false).commit();}
+    }
 }

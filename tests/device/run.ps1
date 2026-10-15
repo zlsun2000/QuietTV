@@ -64,8 +64,23 @@ Check 'signing'
 Guest install -r $Apk
 Guest install -r "$out\checks.apk"
 if($Phase -eq 'fresh'){Guest shell pm clear local.quiettv.launcher}
+if($Phase -eq 'rules'){Guest shell pm revoke local.quiettv.launcher android.permission.READ_TV_LISTINGS}
 Guest shell am force-stop local.quiettv.launcher
 $class=switch($Phase){'display'{'DisplayChecks'} 'rules'{'RuleChecks'} default{'DeviceChecks'}}
 $log=Guest shell am instrument -w -e phase $Phase "local.quiettv.checks/local.quiettv.launcher.$class"
 $log | Tee-Object -FilePath (Join-Path $project "emulator-local\$Serial\$Phase.txt")
 if(-not ($log -match 'INSTRUMENTATION_RESULT: passed=')){throw 'Emulator checks failed; inspect instrumentation output'}
+if($Phase -eq 'rules' -and [int](Guest shell getprop ro.build.version.sdk) -ge 26){
+    try{
+        $seed=Guest shell am broadcast -a local.quiettv.checks.SEED_TV_PROGRAMS -n local.quiettv.checks/.TvProgramFixture
+        if(($seed -join "`n") -notmatch 'synthetic_programs_seeded'){throw 'Cannot seed the isolated TV provider fixture'}
+        Guest shell pm grant local.quiettv.launcher android.permission.READ_TV_LISTINGS
+        Guest shell am force-stop local.quiettv.launcher
+        $inspection=Guest shell am instrument -w local.quiettv.checks/local.quiettv.launcher.TvHistoryChecks
+        $inspection | Tee-Object -FilePath (Join-Path $project "emulator-local\$Serial\tv-provider.txt")
+        if(-not ($inspection -match 'INSTRUMENTATION_RESULT: passed=')){throw 'TV provider checks failed'}
+    }finally{
+        Guest shell pm revoke local.quiettv.launcher android.permission.READ_TV_LISTINGS
+        Guest shell am broadcast -a local.quiettv.checks.CLEAR_TV_PROGRAMS -n local.quiettv.checks/.TvProgramFixture | Out-Null
+    }
+}

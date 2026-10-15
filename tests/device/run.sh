@@ -114,11 +114,23 @@ for phase in fresh upgrade; do
 done
 # Feature regressions use only synthetic apps, IDs, metadata and a locally encoded silent video.
 for scenario in rules display; do
+  if [[ "$scenario" == rules ]]; then adb_device shell pm revoke local.quiettv.launcher android.permission.READ_TV_LISTINGS; fi
   adb_device shell am force-stop local.quiettv.launcher
   runner=RuleChecks
   if [[ "$scenario" == display ]]; then runner=DisplayChecks; fi
   timeout 240s "$adb_bin" -s "$serial" shell am instrument -w "local.quiettv.checks/local.quiettv.launcher.$runner" | tee "$project_root/build/ci-artifacts/$scenario.txt"
   grep -q 'INSTRUMENTATION_RESULT: passed=' "$project_root/build/ci-artifacts/$scenario.txt"
+  if [[ "$scenario" == rules ]] && [[ "$(adb_device shell getprop ro.build.version.sdk | tr -d '\r')" -ge 26 ]]; then
+    (
+      trap 'adb_device shell pm revoke local.quiettv.launcher android.permission.READ_TV_LISTINGS; adb_device shell am broadcast -a local.quiettv.checks.CLEAR_TV_PROGRAMS -n local.quiettv.checks/.TvProgramFixture >/dev/null' EXIT
+      adb_device shell am broadcast -a local.quiettv.checks.SEED_TV_PROGRAMS -n local.quiettv.checks/.TvProgramFixture | tee "$project_root/build/ci-artifacts/tv-provider-seed.txt"
+      grep -q synthetic_programs_seeded "$project_root/build/ci-artifacts/tv-provider-seed.txt"
+      adb_device shell pm grant local.quiettv.launcher android.permission.READ_TV_LISTINGS
+      adb_device shell am force-stop local.quiettv.launcher
+      timeout 120s "$adb_bin" -s "$serial" shell am instrument -w local.quiettv.checks/local.quiettv.launcher.TvHistoryChecks | tee "$project_root/build/ci-artifacts/tv-provider.txt"
+      grep -q 'INSTRUMENTATION_RESULT: passed=' "$project_root/build/ci-artifacts/tv-provider.txt"
+    )
+  fi
 done
 if [[ "${QUIETTV_DOCUMENTATION_CAPTURE:-0}" == 1 ]]; then
   [[ "$image" == 'system-images;android-28;android-tv;x86' ]] || { echo 'Documentation capture requires the isolated API 28 image' >&2; exit 1; }

@@ -26,6 +26,7 @@ public final class LocalMaintenanceReceiver extends BroadcastReceiver {
             else if("local.quiettv.launcher.IMPORT_STATE".equals(action)){File file=new File(context.getExternalFilesDir(null),"quiettv-state-backup.json");if(!file.isFile()||file.length()>4194304)return;byte[] bytes=new byte[(int)file.length()];try(FileInputStream input=new FileInputStream(file)){int offset=0,n;while(offset<bytes.length&&(n=input.read(bytes,offset,bytes.length-offset))>0)offset+=n;if(offset!=bytes.length)return;}JSONObject root=new JSONObject(new String(bytes,"UTF-8"));JSONObject home=root.optJSONObject("home"),weather=root.optJSONObject("weather"),history=root.optJSONObject("playback_history");if(home==null||weather==null||history==null||!valid(home,"home")||!valid(weather,"weather")||!valid(history,"playback_history"))return;JSONObject rules=root.optJSONObject("playback_rules");if(rules!=null&&!PlaybackRules.validBackup(rules))return;normalizeWallpaperBackup(context,home);importStores(context,rules==null?new JSONObject[]{home,weather,history}:new JSONObject[]{home,weather,history,rules});PlaybackRules.get(context).reload();LegacyHistoryListener.refresh();GenericMediaHistory.changed(context);}
             else if("local.quiettv.launcher.EXTRAS_STATUS".equals(action))status(context);
             else if("local.quiettv.launcher.IMPORT_RULE".equals(action))importRule(context);
+            else if("local.quiettv.launcher.INSPECT_TV_HISTORY".equals(action))inspectHistory(context,intent.getStringExtra("package"));
             else if("local.quiettv.launcher.MEDIA_REBIND".equals(action)){GenericMediaHistory.rebind(context);status(context);}
             else if("local.quiettv.launcher.WEATHER_SETUP".equals(action)){
                 // Service terms must be accepted in the visible settings UI.
@@ -34,6 +35,11 @@ public final class LocalMaintenanceReceiver extends BroadcastReceiver {
                 try{if(!repo.consented())return;status(context);}finally{repo.dispose();}
             }
         }catch(Exception ignored){}
+    }
+    private void inspectHistory(Context c,String pkg){
+        final PendingResult pending=goAsync();final android.os.CancellationSignal cancel=new android.os.CancellationSignal();
+        final android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());final Runnable timeout=()->cancel.cancel();handler.postDelayed(timeout,8000);
+        new Thread(()->{try{write(c,"tv-history-inspection.json",TvHistoryInspection.inspect(c,pkg,cancel));pending.setResultCode(android.app.Activity.RESULT_OK);pending.setResultData("inspection_saved");}catch(Exception ignored){pending.setResultCode(android.app.Activity.RESULT_CANCELED);pending.setResultData("inspection_failed");}finally{handler.removeCallbacks(timeout);pending.finish();}},"QuietTV-history-inspection").start();
     }
     private void importRule(Context c){
         try{

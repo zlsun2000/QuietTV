@@ -16,6 +16,8 @@
 
 ## 文件与能力
 
+0.14.0-rc3 提供只读 ADB 排查入口 `local.quiettv.launcher.INSPECT_TV_HISTORY`（同一 DUMP 接收器，字符串 extra `package` 为已安装目标包）。它先检查已有历史总开关、通用及每应用开关，再检查单独的 `android.permission.READ_TV_LISTINGS` 授权，输出应用外部文件目录的 `tv-history-inspection.json`。仅在显式请求时查询系统身份的 `android.media.tv`，通过 URI 的 `package` 参数限定目标，并核对返回包名；最多检查各 32 项 Watch Next/预览节目，有取消及时间边界。结果只保存字段数量、入口能否解析、目标公开 Provider 声明，不保存片名、内容 ID、链接、进度数值或账号信息，不写入历史、不播放。没有授权与确实查到零条必须分别说明；ADB shell 查询可能也受按包过滤，不能用零条直接断言应用没有发布。此入口只是排查工具，尚未增加 `watch_next` 规则适配器。
+
 - [JSON Schema](playback-rules/schema.json)：供编辑器与 AI 检查结构。应用还检查字段引用、包名关系、数值范围及已安装入口。
 - [广播模板](playback-rules/example-broadcast.json)与[媒体会话模板](playback-rules/example-session.json)：虚构接口，不表示真实应用已适配。
 - 内置实例：[B 站](../res/raw/rule_bili_tcl.json)、[奇异果](../res/raw/rule_qiyi_tcl.json)。B 站旧环境曾成功，当前所有者 B 站 1.7.7 尚未成功；未设版本上限不代表全部版本支持。奇异果仅声明打开内容。
@@ -50,6 +52,8 @@
 动态参数只能引用内容标识、渠道、类型和进度/时长。深链通过固定 `data.scheme`、`host`、分段 `path` 及 `query` 构造并编码参数，不接收整个动态 URI。不允许 file/content/javascript/data/intent/http scheme，不转发广播传入的 Intent、播放 URL 或任意 flags。所有跳转限定原目标包，并校验已安装、启用、导出的入口；失败回退到标准活动会话或打开应用。
 
 此版没有脚本、DEX、shell、私有数据库、无障碍采集、网络目录或解码适配器。新增接入机制仍需修改底层代码并审查；已有适配器支持的字段和参数差异可通过 JSON 贡献。
+
+Netflix 已找到系统 Watch Next 数据路径，但尚未接入此 Schema，不能用旧 MediaSession 候选代替。证据、权限过滤修正与适配器待办见 [Netflix 接入调查](NETFLIX-INTEGRATION.md)。
 
 ## 用 AI 制作与贡献
 
