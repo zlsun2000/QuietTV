@@ -67,6 +67,7 @@ public final class RuleChecks extends Instrumentation {
         builtinChecks(c,registry);
         JSONObject session=copy(json).put("id","example.session").put("adapter","media_session");session.remove("event");session.getJSONObject("fields").getJSONObject("id").put("key","mediaId");session.getJSONObject("fields").getJSONObject("title").put("key","title");session.getJSONObject("fields").getJSONObject("position").put("key","position").put("unit","ms");session.getJSONObject("fields").getJSONObject("duration").put("key","duration").put("unit","ms");registry.install(registry.parse(session.toString()));registry.enabled(registry.find("example.session"),true);
         PlaybackRecord media=new PlaybackRecord();media.source=PKG;media.sourceLabel="Fixture";media.command="media/session";media.videoId=MediaRecordPolicy.digest("session");media.title="Synthetic session";media.position=123000;PlaybackRules.decorateSession(c,media,new MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_MEDIA_ID,"session-item").build());check(media.ruleId.equals("example.session")&&media.ruleData.get("id").equals("session-item")&&media.valid(),"standard media metadata can supply an optional persistent route rule");
+        maintenanceChecks(c,registry);
         result.putString("passed",count+" rule checks");finish(Activity.RESULT_OK,result);
     }catch(Throwable error){result.putString("failed",error.toString());finish(Activity.RESULT_CANCELED,result);}finally{if(owned)LegacyHistoryListener.release();}}
     private void builtinChecks(Context c,PlaybackRules registry)throws Exception {
@@ -74,4 +75,24 @@ public final class RuleChecks extends Instrumentation {
         for(String kind:new String[]{"tcl/ugc","tcl/pgc","tcl/pugc"}){event.put("cmdInfo",kind);PlaybackRecord r=PlaybackRules.record(c,bili,bili.extract(event,false));check(r.valid()&&r.key().equals(kind+"|123456|789"),"Bili "+kind+" retains legacy history identity");Intent route=bili.intent(bili.route(PlaybackRules.data(r)),PlaybackRules.data(r));JSONObject values=new JSONObject(route.getStringExtra("value"));check(values.getString("progress").equals("607")&&values.getString("forcePlayProgress").equals("1")&&values.getString(kind.equals("tcl/ugc")?"cId":"epId").equals("789"),"Bili "+kind+" JSON maps exact supplied IDs and forced seconds");if(kind.equals("tcl/pugc"))check(values.getString("isClass").equals("1"),"Bili course route retains its class flag");}
         PlaybackRule qiyi=registry.find(PlaybackRule.QIYI);event.put("cmdInfo","{\"videoId\":\"123456\",\"episodeId\":\"789\",\"chnId\":2}");event.put("duration",300);PlaybackRecord r=PlaybackRules.record(c,qiyi,qiyi.extract(event,false));Intent route=qiyi.intent(qiyi.route(PlaybackRules.data(r)),PlaybackRules.data(r));JSONObject values=new JSONObject(route.getStringExtra("playInfo"));check(r.valid()&&r.duration==300000&&values.getInt("history")==-1&&values.getInt("chnId")==2,"Qiyi JSON keeps typed detail routing and duration units");event.put("videoId","654321");rejects(()->qiyi.extract(event,false),"Qiyi outer and nested content IDs must agree");
     }
+    private void maintenanceChecks(Context c,PlaybackRules registry)throws Exception {
+        ActivityInfo receiver=c.getPackageManager().getReceiverInfo(new ComponentName(c,LocalMaintenanceReceiver.class),0);
+        check(receiver.exported&&"android.permission.DUMP".equals(receiver.permission),"headless rule imports retain the platform DUMP permission boundary");
+        Map<String,?> home=new HashMap<>(c.getSharedPreferences("home",0).getAll()),weather=new HashMap<>(c.getSharedPreferences("weather",0).getAll()),history=new HashMap<>(c.getSharedPreferences("playback_history",0).getAll());
+        File file=new File(c.getExternalFilesDir(null),"playback-rule-import.json");LocalMaintenanceReceiver importer=new LocalMaintenanceReceiver();Intent action=new Intent("local.quiettv.launcher.IMPORT_RULE");String id="example.maintenance";
+        try{
+            JSONObject json=rule().put("id",id);save(file,json.toString());importer.onReceive(c,action);
+            check(registry.find(id)!=null&&!registry.enabled(registry.find(id)),"headless import uses the registry and keeps a new rule disabled");
+            registry.enabled(registry.find(id),true);importer.onReceive(c,action);
+            check(registry.find(id).revision==1&&registry.enabled(registry.find(id)),"rejected same-revision import preserves the active rule and choice");
+            Map<String,?> rules=new HashMap<>(c.getSharedPreferences("playback_rules",0).getAll());save(file,"{malformed");importer.onReceive(c,action);
+            check(rules.equals(c.getSharedPreferences("playback_rules",0).getAll()),"malformed headless imports leave the registry preferences intact");
+            char[] large=new char[PlaybackRule.MAX_BYTES+1];Arrays.fill(large,' ');save(file,new String(large));importer.onReceive(c,action);
+            check(rules.equals(c.getSharedPreferences("playback_rules",0).getAll()),"headless rule files enforce the same 64 KB input bound");
+            save(file,json.put("revision",2).toString());importer.onReceive(c,action);
+            check(registry.find(id).revision==2&&!registry.enabled(registry.find(id))&&registry.canRollback(registry.find(id)),"headless updates disable the new revision and retain rollback");
+            check(home.equals(c.getSharedPreferences("home",0).getAll())&&weather.equals(c.getSharedPreferences("weather",0).getAll())&&history.equals(c.getSharedPreferences("playback_history",0).getAll()),"rule-only import preserves desktop preferences, weather and every history field");
+        }finally{if(file.isFile()&&!file.delete())throw new IOException("Cannot clean synthetic rule import");}
+    }
+    private static void save(File file,String value)throws Exception {try(Writer writer=new OutputStreamWriter(new FileOutputStream(file),"UTF-8")){writer.write(value);}}
 }

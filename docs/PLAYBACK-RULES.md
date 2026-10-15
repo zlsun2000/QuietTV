@@ -12,6 +12,8 @@
 
 「检查配置与最近记录」只检查字段、目标和可解析的入口，不启动目标应用。状态可区分总开关关闭、应用停用、版本/签名不匹配、缺少字段、等待事件及入口失效。只有用户点击卡片才尝试打开内容或播放。
 
+0.14.0-rc2 起，设备所有者也可通过 ADB 做后台单规则导入：把 JSON 放到应用外部文件目录中的固定文件 `playback-rule-import.json`，向 `local.quiettv.launcher/.LocalMaintenanceReceiver` 显式发送 `local.quiettv.launcher.IMPORT_RULE`。此接收器要求系统 `android.permission.DUMP` 权限；导入使用同一 64 KB 校验、版本递增与回退机制，成功返回 `imported_disabled:规则ID:revision`，失败只返回 `rule_import_failed`，不会启动界面或播放，也不回写其他设置和历史。随后仍需用户在设置中主动启用。该入口不要求切换 HOME；APK 覆盖安装及 OEM 行为需另行观察，不能由配置导入推断播放绝无停顿。
+
 ## 文件与能力
 
 - [JSON Schema](playback-rules/schema.json)：供编辑器与 AI 检查结构。应用还检查字段引用、包名关系、数值范围及已安装入口。

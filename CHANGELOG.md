@@ -1,3 +1,7 @@
+# 0.14.0-rc2
+
+- Add a DUMP-permission-protected ADB rule-only import. It validates the bounded JSON file through the normal registry, keeps imports disabled and reports a fixed result without opening UI or restoring history, backgrounds or other preferences. Netflix content-route inspection alone does not establish a usable media ID or exact resume support.
+
 # 0.14.0-rc1
 
 - Add local, modular playback rules: broadcast and MediaSession mappings, typed content/progress routes, app version/signature checks, opt-in JSON import, per-rule enable/disable, preflight diagnostics and one-version rollback. Move existing Bilibili/Qiyi routes into bundled JSON; retain legacy history identities, progress and choices. Include a schema, templates and an AI/community contribution guide. Rules cannot supply interfaces missing from the target app; current Bilibili 1.7.7 remains unverified.

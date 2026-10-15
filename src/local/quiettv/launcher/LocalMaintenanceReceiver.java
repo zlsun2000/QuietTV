@@ -25,6 +25,7 @@ public final class LocalMaintenanceReceiver extends BroadcastReceiver {
             if("local.quiettv.launcher.EXPORT_STATE".equals(action)){JSONObject root=new JSONObject();for(String name:new String[]{"home","weather","playback_history","playback_rules"})root.put(name,export(context.getSharedPreferences(name,Context.MODE_PRIVATE)));write(context,"quiettv-state-backup.json",root);}
             else if("local.quiettv.launcher.IMPORT_STATE".equals(action)){File file=new File(context.getExternalFilesDir(null),"quiettv-state-backup.json");if(!file.isFile()||file.length()>4194304)return;byte[] bytes=new byte[(int)file.length()];try(FileInputStream input=new FileInputStream(file)){int offset=0,n;while(offset<bytes.length&&(n=input.read(bytes,offset,bytes.length-offset))>0)offset+=n;if(offset!=bytes.length)return;}JSONObject root=new JSONObject(new String(bytes,"UTF-8"));JSONObject home=root.optJSONObject("home"),weather=root.optJSONObject("weather"),history=root.optJSONObject("playback_history");if(home==null||weather==null||history==null||!valid(home,"home")||!valid(weather,"weather")||!valid(history,"playback_history"))return;JSONObject rules=root.optJSONObject("playback_rules");if(rules!=null&&!PlaybackRules.validBackup(rules))return;normalizeWallpaperBackup(context,home);importStores(context,rules==null?new JSONObject[]{home,weather,history}:new JSONObject[]{home,weather,history,rules});PlaybackRules.get(context).reload();LegacyHistoryListener.refresh();GenericMediaHistory.changed(context);}
             else if("local.quiettv.launcher.EXTRAS_STATUS".equals(action))status(context);
+            else if("local.quiettv.launcher.IMPORT_RULE".equals(action))importRule(context);
             else if("local.quiettv.launcher.MEDIA_REBIND".equals(action)){GenericMediaHistory.rebind(context);status(context);}
             else if("local.quiettv.launcher.WEATHER_SETUP".equals(action)){
                 // Service terms must be accepted in the visible settings UI.
@@ -33,6 +34,16 @@ public final class LocalMaintenanceReceiver extends BroadcastReceiver {
                 try{if(!repo.consented())return;status(context);}finally{repo.dispose();}
             }
         }catch(Exception ignored){}
+    }
+    private void importRule(Context c){
+        try{
+            File dir=c.getExternalFilesDir(null);if(dir==null)throw new java.io.IOException("No import directory");
+            PlaybackRules registry=PlaybackRules.get(c);
+            try(FileInputStream input=new FileInputStream(new File(dir,"playback-rule-import.json"))){
+                PlaybackRule rule=registry.parse(PlaybackRules.read(input));registry.install(rule);
+                setResultCode(android.app.Activity.RESULT_OK);setResultData("imported_disabled:"+rule.id+":"+rule.revision);
+            }
+        }catch(Exception ignored){setResultCode(android.app.Activity.RESULT_CANCELED);setResultData("rule_import_failed");}
     }
     private static void status(Context c) throws Exception {
         JSONObject j=new JSONObject();SharedPreferences weather=c.getSharedPreferences("weather",Context.MODE_PRIVATE);HistoryStore history=new HistoryStore(c);j.put("version",c.getPackageManager().getPackageInfo(c.getPackageName(),0).versionName);j.put("api",android.os.Build.VERSION.SDK_INT);j.put("manufacturer",android.os.Build.MANUFACTURER);j.put("model",android.os.Build.MODEL);j.put("lowRam",((android.app.ActivityManager)c.getSystemService(Context.ACTIVITY_SERVICE)).isLowRamDevice());j.put("historyCount",history.list().size());j.put("historyEnabled",history.enabled());j.put("musicHistoryEnabled",history.musicEnabled());int music=0;for(PlaybackRecord r:history.list())if(r.apple())music++;j.put("musicHistoryCount",music);j.put("genericHistoryEnabled",history.genericEnabled());j.put("notificationAccess",GenericMediaHistory.permission(c));j.put("mediaListenerConnected",MediaHistoryService.active);j.put("mediaListenerSupported",!GenericMediaHistory.lowRamListenerUnsupported(c));j.put("watchNextProviderAvailable",c.getPackageManager().resolveContentProvider("android.media.tv",0)!=null);int generic=0;for(PlaybackRecord r:history.list())if(r.generic())generic++;j.put("genericHistoryCount",generic);j.put("activeSessionCount",GenericMediaHistory.sessions(c).size());j.put("weatherEnabled",weather.getBoolean("enabled",false));j.put("weatherConsent",weather.getString("consent",""));
