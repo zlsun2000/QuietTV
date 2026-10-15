@@ -69,15 +69,17 @@ final class PlaybackRules {
     synchronized String status(PlaybackRule rule){
         if(!enabled(rule))return "已停用";String target=targetStatus(rule);if(!target.isEmpty())return target;
         HistoryStore store=new HistoryStore(context);if(!store.enabled())return "播放记录总开关已关闭";if(!store.appEnabled(rule.pkg))return "此应用的播放记录已关闭";
-        if((rule.adapter.equals("media_session")||rule.id.equals(PlaybackRule.QIYI))&&!store.genericEnabled())return "其他应用自动识别已关闭";
+        if((rule.adapter.equals("media_session")||rule.adapter.equals("watch_next")||rule.id.equals(PlaybackRule.QIYI))&&!store.genericEnabled())return "其他应用自动识别已关闭";
         if(rule.adapter.equals("media_session")&&!GenericMediaHistory.capability(context).isAvailable())return GenericMediaHistory.availability(context);
-        String last=diagnostics.get(rule.id);return last==null?rule.adapter.equals("broadcast")?"等待匹配的历史广播":"等待匹配的媒体会话":last;
+        if(rule.adapter.equals("watch_next")&&!WatchNextHistory.availability(context).isEmpty())return WatchNextHistory.availability(context);
+        String last=diagnostics.get(rule.id);return last==null?rule.adapter.equals("broadcast")?"等待匹配的历史广播":rule.adapter.equals("watch_next")?"等待系统继续观看记录":"等待匹配的媒体会话":last;
     }
     String describe(PlaybackRule rule){
         JSONObject verification=rule.json.optJSONObject("verification");String range=rule.target.optLong("minVersionCode",0)+"–"+(rule.target.has("maxVersionCode")?String.valueOf(rule.target.optLong("maxVersionCode")):"未设上限");
-        return rule.json.optString("description")+"\n\n目标："+rule.pkg+"\n应用 versionCode："+range+"\n接入："+(rule.adapter.equals("broadcast")?"历史广播":"媒体会话")+"\n作者："+rule.json.optString("author")+" · "+rule.json.optString("license")+"\n验证："+verification.optString("status")+"\n"+verification.optString("notes")+"\n\n"+(rule.target.has("certSha256")?"已限定目标应用签名。":"未限定应用签名；包名声明不代表广播发送者已经认证。")+"\n停用或更新规则会保留已有记录；接口失效时可打开原应用。";
+        return (rule.adapter.equals("watch_next")&&rule.json.optJSONObject("watchNext").has("artwork")?"此规则启用系统海报：可从规则限定的 HTTPS 主机下载图片并缓存；对方可见 IP 与图片路径。\n\n":"")+rule.json.optString("description")+"\n\n目标："+rule.pkg+"\n应用 versionCode："+range+"\n接入："+(rule.adapter.equals("broadcast")?"历史广播":rule.adapter.equals("watch_next")?"系统 Watch Next":"媒体会话")+"\n作者："+rule.json.optString("author")+" · "+rule.json.optString("license")+"\n验证："+verification.optString("status")+"\n"+verification.optString("notes")+"\n\n"+(rule.target.has("certSha256")?"已限定目标应用签名。":"未限定应用签名；包名声明不代表广播发送者已经认证。")+"\n停用或更新规则会保留已有记录；接口失效时可打开原应用。";
     }
     String preview(PlaybackRule rule){
+        if(rule.adapter.equals("watch_next"))return "配置语法已通过校验。\n"+status(rule)+"\n点击时重新读取系统记录并校验入口；进度由原应用决定。\n本次预检没有启动应用。";
         String target=targetStatus(rule);StringBuilder result=new StringBuilder("配置语法与字段声明已通过校验。\n目标：").append(target.isEmpty()?"应用和版本匹配":target);
         for(PlaybackRecord record:new HistoryStore(context).list())if(rule.id.equals(ruleId(record))&&rule.pkg.equals(record.source))try{Intent intent=route(rule,record);result.append("\n最近记录：").append(intent==null?"无匹配或可解析的入口":"可构造并解析目标入口");result.append("\n本次预检没有启动应用或发送播放命令。");return result.toString();}catch(Exception ignored){result.append("\n最近记录：与当前规则字段不匹配");return result.toString();}
         return result.append("\n尚无对应记录；开启后可等待原应用提供信息。\n").append(status(rule)).toString();
@@ -108,7 +110,7 @@ final class PlaybackRules {
             }
         }catch(Exception ignored){}
     }
-    private static long started(Context c,PlaybackRecord record)throws Exception {
+    static long started(Context c,PlaybackRecord record)throws Exception {
         SharedPreferences history=c.getSharedPreferences("playback_history",Context.MODE_PRIVATE);JSONArray previous=new JSONArray(history.getString("vendor_sessions","[]")),next=new JSONArray();long start=record.updated;
         for(int i=0;i<Math.min(16,previous.length());i++){JSONObject item=previous.optJSONObject(i);if(item==null)continue;if(record.key().equals(item.optString("key"))){if(record.updated-item.optLong("seen")<3600000&&record.position>=item.optLong("position")-30000)start=item.optLong("started",record.updated);}else if(record.updated-item.optLong("seen")<259200000L)next.put(item);}
         JSONObject item=new JSONObject();item.put("key",record.key());item.put("position",record.position);item.put("started",start);item.put("seen",record.updated);JSONArray bounded=new JSONArray();bounded.put(item);for(int i=0;i<Math.min(15,next.length());i++)bounded.put(next.getJSONObject(i));history.edit().putString("vendor_sessions",bounded.toString()).apply();return start;
@@ -138,11 +140,12 @@ final class PlaybackRules {
         return intent;
     }
     String action(PlaybackRecord record){
-        PlaybackRule rule=usable(record);if(rule!=null)try{JSONObject route=rule.route(data(record));if(route!=null&&route(rule,record)!=null)return route.getString("capability").equals("position")?"尝试继续播放":"打开内容";}catch(Exception ignored){note(rule,"记录与当前规则不匹配");}
+        PlaybackRule rule=usable(record);if(rule!=null&&record.watchNext())return WatchNextHistory.eligible(context,rule)?"尝试继续观看":"打开应用";if(rule!=null)try{JSONObject route=rule.route(data(record));if(route!=null&&route(rule,record)!=null)return route.getString("capability").equals("position")?"尝试继续播放":"打开内容";}catch(Exception ignored){note(rule,"记录与当前规则不匹配");}
         return "打开应用";
     }
     boolean openRoute(PlaybackRecord record){
         if(!record.valid())return false;PlaybackRule rule=usable(record);if(rule==null)return false;
+        if(record.watchNext()){if(!WatchNextHistory.eligible(context,rule))return false;WatchNextHistory.open(context,rule,record);return true;}
         try{Intent intent=route(rule,record);if(intent!=null){context.startActivity(intent);note(rule,"已发送续播请求；实际播放需在目标应用确认");return true;}}catch(Exception ignored){note(rule,"续播请求失败，已回退打开应用");}return false;
     }
     static String read(InputStream input)throws Exception {PlaybackRule.require(input!=null,"无法读取规则文件");ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] buffer=new byte[4096];int count;while((count=input.read(buffer))!=-1){PlaybackRule.require(bytes.size()+count<=PlaybackRule.MAX_BYTES,"规则文件超过 64 KB");bytes.write(buffer,0,count);}String raw=new String(bytes.toByteArray(),"UTF-8");return raw.startsWith("\ufeff")?raw.substring(1):raw;}

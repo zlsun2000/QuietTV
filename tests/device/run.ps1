@@ -79,6 +79,10 @@ if($Phase -eq 'rules' -and [int](Guest shell getprop ro.build.version.sdk) -ge 2
         $inspection=Guest shell am instrument -w local.quiettv.checks/local.quiettv.launcher.TvHistoryChecks
         $inspection | Tee-Object -FilePath (Join-Path $project "emulator-local\$Serial\tv-provider.txt")
         if(-not ($inspection -match 'INSTRUMENTATION_RESULT: passed=')){throw 'TV provider checks failed'}
+        Guest shell am force-stop local.quiettv.launcher
+        $native=Guest shell am instrument -w local.quiettv.checks/local.quiettv.launcher.WatchNextChecks
+        $native | Tee-Object -FilePath (Join-Path $project "emulator-local\$Serial\watch-next.txt")
+        if(-not ($native -match 'INSTRUMENTATION_RESULT: passed=')){throw 'Watch Next integration checks failed'}
     }finally{
         Guest shell pm revoke local.quiettv.launcher android.permission.READ_TV_LISTINGS
         Guest shell am broadcast -a local.quiettv.checks.CLEAR_TV_PROGRAMS -n local.quiettv.checks/.TvProgramFixture | Out-Null

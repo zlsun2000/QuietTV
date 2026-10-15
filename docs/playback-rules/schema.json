@@ -120,7 +120,8 @@
     "adapter": {
       "enum": [
         "broadcast",
-        "media_session"
+        "media_session",
+        "watch_next"
       ]
     },
     "event": {
@@ -333,6 +334,126 @@
       "items": {
         "$ref": "#/$defs/route"
       }
+    },
+    "watchNext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "types",
+        "intent"
+      ],
+      "properties": {
+        "types": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "continue",
+              "next",
+              "new",
+              "watchlist"
+            ]
+          }
+        },
+        "intent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "data"
+          ],
+          "properties": {
+            "action": {
+              "$ref": "#/$defs/action"
+            },
+            "component": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+$"
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "scheme",
+                "host",
+                "path",
+                "queryKeys"
+              ],
+              "properties": {
+                "scheme": {
+                  "type": "string",
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9+.-]*$",
+                  "not": {
+                    "enum": [
+                      "file",
+                      "content",
+                      "javascript",
+                      "data",
+                      "intent",
+                      "http"
+                    ]
+                  }
+                },
+                "host": {
+                  "type": "string",
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9.-]+$"
+                },
+                "path": {
+                  "type": "array",
+                  "maxItems": 8,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^(\\*|[A-Za-z0-9_-]{1,80})$"
+                  }
+                },
+                "queryKeys": {
+                  "type": "array",
+                  "maxItems": 20,
+                  "uniqueItems": true,
+                  "items": {
+                    "$ref": "#/$defs/key"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "artwork": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "httpsHosts"
+          ],
+          "properties": {
+            "source": {
+              "const": "poster"
+            },
+            "httpsHosts": {
+              "type": "array",
+              "maxItems": 4,
+              "items": {
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^(\\*\\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$"
+              }
+            },
+            "queryKeys": {
+              "type": "array",
+              "maxItems": 8,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/key"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "allOf": [
@@ -354,6 +475,258 @@
           "required": [
             "event"
           ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "adapter": {
+            "const": "watch_next"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "watchNext"
+        ],
+        "properties": {
+          "routes": {
+            "items": {
+              "properties": {
+                "capability": {
+                  "const": "native"
+                }
+              }
+            }
+          },
+          "fields": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "properties": {
+                  "key": {
+                    "const": "providerIdHash"
+                  },
+                  "type": {
+                    "const": "id"
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "default"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "jsonKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "equalsKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "equalsJsonKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "values"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "title": {
+                "properties": {
+                  "key": {
+                    "const": "title"
+                  },
+                  "type": {
+                    "const": "text"
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "default"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "jsonKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "equalsKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "equalsJsonKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "values"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "subtitle": {
+                "properties": {
+                  "key": {
+                    "const": "episodeTitle"
+                  },
+                  "type": {
+                    "const": "text"
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "default"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "jsonKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "equalsKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "equalsJsonKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "values"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "position": {
+                "properties": {
+                  "key": {
+                    "const": "position"
+                  },
+                  "type": {
+                    "const": "time"
+                  },
+                  "unit": {
+                    "const": "ms"
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "default"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "jsonKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "equalsKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "equalsJsonKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "values"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "duration": {
+                "properties": {
+                  "key": {
+                    "const": "duration"
+                  },
+                  "type": {
+                    "const": "time"
+                  },
+                  "unit": {
+                    "const": "ms"
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "default"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "jsonKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "equalsKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "equalsJsonKey"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "values"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "watchNext"
+          ]
+        },
+        "properties": {
+          "routes": {
+            "items": {
+              "properties": {
+                "capability": {
+                  "enum": [
+                    "content",
+                    "position"
+                  ]
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -614,8 +987,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "capability",
-        "intent"
+        "capability"
       ],
       "properties": {
         "when": {
@@ -657,7 +1029,8 @@
         "capability": {
           "enum": [
             "content",
-            "position"
+            "position",
+            "native"
           ]
         },
         "intent": {
@@ -751,7 +1124,30 @@
             }
           ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "capability": {
+                "const": "native"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "intent"
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "intent"
+            ]
+          }
+        }
+      ]
     }
   }
 }

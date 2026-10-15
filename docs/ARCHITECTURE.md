@@ -10,8 +10,9 @@
 | `Wallpapers.java` / `WallpaperImportPolicy.java` | 图片/静音视频渲染；选定文件复制与大小限制 |
 | `HistoryStore.java` / `PlaybackRecord.java` | 本地记录、最多 8 项、去重、删除标记和真实操作标签 |
 | `MediaHistoryService.java` / `GenericMediaHistory.java` | 通过获准的 MediaSession 监听与当前会话恢复 |
+| `WatchNextHistory.java` | 用户启用的系统 Watch Next 读取、来源及入口校验、点击时重新查询；不保存完整链接 |
 | `PlaybackRule.java` / `PlaybackRules.java` / `RuleHistoryReceiver.java` | 有界声明式规则、导入/启停/回退、广播/会话映射、目标校验及续播；内置渠道规则在 `res/raw/rule_*.json` |
-| `Covers.java` / `MediaArtwork.java` | 媒体应用提供的 bitmap/所属 content provider，本地限额缓存；不下载网络封面 |
+| `Covers.java` / `MediaArtwork.java` | 媒体应用提供的 bitmap/所属 content provider，本地限额缓存；WatchNextArtwork 的可选系统海报例外见 ARTWORK-REVIEW.md |
 | `WeatherRepository.java` / `WeatherButton.java` | 同意后查询天气，缓存与离线状态 |
 | `LocalMaintenanceReceiver.java` | 仅持系统 DUMP 权限的本地维护接口，不是公网服务 |
 | `res/raw/` | 原创山湖背景和 `ui_defaults.properties` |
@@ -38,10 +39,16 @@
 
 ## 本地数据与迁移
 
-`TvHistoryInspection` 是显式 DUMP 维护请求触发的只读排查工具，独立检查 `READ_TV_LISTINGS` 授权及历史开关，只在固定系统提供者中按目标包查询有界 Watch Next/预览数据；保存脱敏计数，不自动采集历史或启动提供者给出的 Intent。它区分权限过滤和空结果，当前不属于 JSON 的新接入适配器。
+`TvHistoryInspection` 是显式 DUMP 维护请求触发的只读排查工具，独立检查 `READ_TV_LISTINGS` 授权及历史开关，只在固定系统提供者中按目标包查询有界 Watch Next/预览数据；保存脱敏计数，不自动采集历史或启动提供者给出的 Intent。它区分权限过滤和空结果，另有 `WatchNextHistory` 供用户主动启用的 `watch_next` JSON 规则采集记录。
 
 `home` preferences 保存收藏、分类顺序、主题、自定义背景路径和 Home 键修复开关；`playback_history` 保存 JSON 记录及开关；`playback_rules` 保存本地规则、前版和启用选择；`weather` 的具体键由 WeatherRepository 管理。用户媒体位于本应用 external-files / files，缓存可丢弃，配置不能在更新时重置。维护导出包含规则，导入有界校验并兼容不含规则的旧备份。
 
 0.12.0 为 home 与 playback_history 增加 `config_schema=1`。发现旧 preferences 时保留字段及旧默认行为；全新记录 preferences 明确默认关闭 enabled/music_enabled/generic_enabled。迁移没有删除旧键，未知播放字段仍由宽容 JSON 读取处理。后续迁移应逐级、幂等、先判断存在性，并测试升级保留配置。
 
 Direct Boot 解锁前只显示内置资源，不读取凭据保护的收藏、记录或导入背景。天气需确认当前服务条件、手动选城市并启用后工作；旧天气选择保留，但联网须重新确认。可选权限和网络失败不妨碍基础桌面。详情见 [隐私说明](../PRIVACY.md)。
+
+Watch Next 适配器仅在 API 26+、用户解锁、历史/通用/每应用开关和规则开启、节目表读取权限及目标签名/版本匹配时工作。验证固定系统 authority，以 package 查询参数并逐行核对来源；每规则至多读取最新 32 行，整体约 7 秒并支持取消，仍只保留 8 项历史。Activity/系统绑定服务共享 ContentObserver 所有权，没有独立保活服务，返回主页会刷新。权限、提供者或字段缺失时不影响基础桌面。
+
+原始 internal_provider_id 只生成包名域内摘要；记录保存摘要、数字行定位、真实标题和进度。点击时按摘要重新匹配系统记录，行复用或删除不会打开另一内容。系统 Intent 使用 parseUri(raw, 0) 兼容两种 Android 序列化格式；只按 JSON 固定的 action、可选组件、scheme/host、路径和参数名重建，不转发 flags、extras、selector、ClipData 或任意组件。封装参数只在此次查询/跳转内存中存在，完整 URI 不写历史、缓存或日志。原生入口能力为 native，进度由应用决定；读取成功不等于精确续播成功。
+
+同一应用存在可用 Watch Next 内容记录时，展示层隐藏缺少内容身份、时长和副标题的 MediaSession 应用占位项；不按相似片名合并内容，不删除原键，停用来源后可恢复占位项。海报参数由独立可选 JSON 声明，传递于读取任务内存，存储仍只接受 localart 摘要；网络实现及来源审查与普通会话/广播封面分开。

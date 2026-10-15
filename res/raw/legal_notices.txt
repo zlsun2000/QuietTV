@@ -41,3 +41,9 @@ No music client, account tool, DRM implementation or third-party media is bundle
 
 Source, full notices and review:
 https://github.com/zlsun2000/QuietTV
+
+Optional Watch Next artwork is supplied by the installed media application.
+Explicitly enabled rules may load images from declared HTTPS hosts; those hosts
+receive the device IP, image path and declared publisher image parameters. Images are cached locally, never bundled
+or licensed by QuietTV. Service access rights remain with the source provider.
+See docs/ARTWORK-REVIEW.md in the source repository.

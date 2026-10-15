@@ -1,3 +1,9 @@
+# 0.14.0-rc12
+
+- Add an opt-in, generic Watch Next adapter with app-scoped system-provider reads, stable hashed publisher identities, bounded/cancellable work and lifecycle ownership. App versions, signatures, source types and native entry contracts remain in independently imported JSON; no Netflix/TCL logic in the desktop. Handle both Android Intent URI serialization formats and re-read/revalidate the same content on click. Native progress remains controlled by the source app.
+- Hide empty MediaSession application placeholders when the same app has usable native content, retaining original history keys and progress. Add separately reviewed, optional publisher-supplied artwork: declared HTTPS hosts and image parameter names, pinned target identity, bounded local image cache, no catalog lookup or persisted URLs. Defaults and existing rules do not enable image networking.
+- Publish sanitized, manually enabled Netflix and TCL Bilibili JSON configurations with explicit validation limits. Add Watch Next schema/template, runtime permission flow, explicit DUMP rule-choice maintenance, redacted source/entry/artwork diagnostics, privacy/service review and isolated API 28/30 integration checks. Owner confirmed Netflix build 27207 can resume after clicking; this is not an all-device or exact-position claim. Local release candidate; no public Release.
+
 # 0.14.0-rc3
 
 - Add an explicit, DUMP-protected TV-history diagnostic to distinguish missing TV-listings permission from empty Watch Next/preview results. Reads require the existing history opt-ins plus a separately granted READ_TV_LISTINGS permission, use a fixed system authority and package filter, and report bounded counts and public provider declarations only. It does not collect content into history, launch playback or establish Netflix resume support.

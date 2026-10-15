@@ -23,8 +23,8 @@ for name in files:
     if name.startswith('src/'):
         for marker in excluded:
             if marker in data:errors.append((name,'excluded public-release interface'))
-        if path.name not in ('JsonHttp.java',) and b'openConnection(' in data:
-            errors.append((name,'network operation outside reviewed weather client'))
+        if path.name not in ('JsonHttp.java','WatchNextArtwork.java') and b'openConnection(' in data:
+            errors.append((name,'network operation outside reviewed weather/artwork clients'))
     if b'\x00' in data:continue
     for label,pattern in patterns:
         if re.search(pattern,data):errors.append((name,label))

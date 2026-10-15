@@ -129,6 +129,9 @@ for scenario in rules display; do
       adb_device shell am force-stop local.quiettv.launcher
       timeout 120s "$adb_bin" -s "$serial" shell am instrument -w local.quiettv.checks/local.quiettv.launcher.TvHistoryChecks | tee "$project_root/build/ci-artifacts/tv-provider.txt"
       grep -q 'INSTRUMENTATION_RESULT: passed=' "$project_root/build/ci-artifacts/tv-provider.txt"
+      adb_device shell am force-stop local.quiettv.launcher
+      timeout 120s "$adb_bin" -s "$serial" shell am instrument -w local.quiettv.checks/local.quiettv.launcher.WatchNextChecks | tee "$project_root/build/ci-artifacts/watch-next.txt"
+      grep -q 'INSTRUMENTATION_RESULT: passed=' "$project_root/build/ci-artifacts/watch-next.txt"
     )
   fi
 done

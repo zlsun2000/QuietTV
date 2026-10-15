@@ -15,7 +15,8 @@ public final class TvProgramFixture extends BroadcastReceiver {
             for(int i=0;i<3;i++){
                 ContentValues row=new ContentValues();row.put("title","QuietTV synthetic fixture");row.put("type",0);row.put("watch_next_type",i==2?1:0);row.put("searchable",1);row.put("internal_provider_id",i==2?"fixture.next":i==0?"80000001":"80000002");row.put("last_playback_position_millis",83000);row.put("duration_millis",300000);
                 Intent route=new Intent("local.quiettv.checks.RESUME").setComponent(new ComponentName(i==1?"org.example.foreign":c.getPackageName(),i==1?"org.example.foreign.Player":"local.quiettv.checks.RuleTargetActivity"));
-                row.put("intent_uri",route.toUri(Intent.URI_INTENT_SCHEME));c.getContentResolver().insert(table,row);
+                if(i==0)row.put("poster_art_uri","content://local.quiettv.checks.documents/image");row.put("last_engagement_time_utc_millis",System.currentTimeMillis()-i*1000);route.setData(Uri.parse("https://example.invalid/deeplink?payload=fixture%2Bvalue%2F%3D"));
+                row.put("intent_uri",route.toUri(i==0?0:Intent.URI_INTENT_SCHEME));c.getContentResolver().insert(table,row);
             }
             setResultCode(-1);setResultData("synthetic_programs_seeded");
         }catch(Exception ignored){setResultCode(0);setResultData("synthetic_programs_unavailable");}

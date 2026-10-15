@@ -16,13 +16,13 @@ final class LegacyHistoryListener extends BroadcastReceiver {
         if(current!=null){owners++;return true;}
         LegacyHistoryListener listener=new LegacyHistoryListener(c);
         IntentFilter filter=filter(c);
-        try{listener.context.registerReceiver(listener,filter);current=listener;owners=1;return true;}catch(Exception ignored){return false;}
+        try{listener.context.registerReceiver(listener,filter);current=listener;owners=1;WatchNextHistory.start(c);return true;}catch(Exception ignored){return false;}
     }
     private static IntentFilter filter(Context c){IntentFilter filter=new IntentFilter();for(String action:PlaybackRules.get(c).actions())filter.addAction(action);if(filter.countActions()==0)filter.addAction("local.quiettv.launcher.NO_HISTORY_RULES");return filter;}
-    static synchronized void refresh(){if(current==null)return;LegacyHistoryListener listener=current;try{listener.context.unregisterReceiver(listener);}catch(Exception ignored){}try{listener.context.registerReceiver(listener,filter(listener.context));}catch(Exception ignored){current=null;owners=0;}}
+    static synchronized void refresh(){WatchNextHistory.refresh();if(current==null)return;LegacyHistoryListener listener=current;try{listener.context.unregisterReceiver(listener);}catch(Exception ignored){}try{listener.context.registerReceiver(listener,filter(listener.context));}catch(Exception ignored){current=null;owners=0;WatchNextHistory.stop();}}
     static synchronized void release(){
         if(current==null||owners<=0)return;if(--owners>0)return;
-        LegacyHistoryListener listener=current;current=null;
+        LegacyHistoryListener listener=current;current=null;WatchNextHistory.stop();
         try{listener.context.unregisterReceiver(listener);}catch(Exception ignored){}
     }
     static boolean skipManifest(Intent intent){return current!=null&&intent!=null&&intent.getPackage()==null&&intent.getComponent()==null;}

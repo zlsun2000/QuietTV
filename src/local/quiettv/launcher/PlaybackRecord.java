@@ -17,9 +17,11 @@ final class PlaybackRecord {
     boolean generic(){return !bili()&&!apple();}
     boolean music(){return apple()||(generic()&&audio);}
     String service(){return apple()?"Apple Music":bili()?"B 站":sourceLabel.isEmpty()?source:sourceLabel;}
-    boolean configured(){return command.equals("rule/broadcast");}
+    boolean appPlaceholder(){return command.equals("media/session")&&contentId.isEmpty()&&ruleId.isEmpty()&&duration==0&&episode.isEmpty()&&album.isEmpty()&&(title.equals(sourceLabel)||title.equals(source));}
+    boolean watchNext(){return command.equals("rule/watch_next");}
+    boolean configured(){return command.equals("rule/broadcast")||watchNext();}
     String key(){return apple()?"applemusic|"+videoId:configured()?"rule|"+source+"|"+videoId:generic()?"generic|"+source+"|"+videoId:command+"|"+videoId+"|"+episodeId;}
-    boolean valid(){return ruleFieldsValid()&&!title.isEmpty()&&title.length()<=240&&(apple()?musicId(videoId):bili()?numeric(videoId)&&(episodeId.isEmpty()||numeric(episodeId)):MediaRecordPolicy.packageName(source)&&sourceLabel.length()<=160&&episode.length()<=160&&album.length()<=160&&videoId.matches("[a-f0-9]{64}")&&(contentId.isEmpty()||contentId.matches("[a-f0-9]{64}"))&&(command.equals("media/session")||(configured()&&!ruleId.isEmpty()&&ruleData.containsKey("id"))||(command.equals("media/qiyi")&&QiyiRoute.valid(this))));}
+    boolean valid(){return (!watchNext()||(numeric(routeId)&&contentId.matches("[a-f0-9]{64}")&&contentId.equals(ruleData.get("id"))))&&ruleFieldsValid()&&!title.isEmpty()&&title.length()<=240&&(apple()?musicId(videoId):bili()?numeric(videoId)&&(episodeId.isEmpty()||numeric(episodeId)):MediaRecordPolicy.packageName(source)&&sourceLabel.length()<=160&&episode.length()<=160&&album.length()<=160&&videoId.matches("[a-f0-9]{64}")&&(contentId.isEmpty()||contentId.matches("[a-f0-9]{64}"))&&(command.equals("media/session")||(configured()&&!ruleId.isEmpty()&&ruleData.containsKey("id"))||(command.equals("media/qiyi")&&QiyiRoute.valid(this))));}
     private boolean ruleFieldsValid(){if(!ruleId.isEmpty()&&!ruleId.matches("[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+"))return false;if(ruleId.length()>80||ruleData.size()>4)return false;for(java.util.Map.Entry<String,String> item:ruleData.entrySet())if(!java.util.Arrays.asList("id","episodeId","variant","channel").contains(item.getKey())||!PlaybackRule.token(item.getValue()))return false;return true;}
     boolean canResume(){return valid()&&bili()&&!episodeId.isEmpty();}
     String actionLabel(){return apple()?"打开应用":canResume()?"继续播放":generic()&&!command.equals("media/qiyi")?"打开应用":"打开内容";}

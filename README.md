@@ -35,6 +35,7 @@
 - **继续播放要看原应用是否支持。** 有些能接着播，有些只能打开内容或应用；不能保证每个视频、音乐应用都能精确续播。
 - **可选应用适配规则（0.14.0 起）。** 在继续播放设置中导入、启停社区 JSON 规则；适用版本和实测情况见规则说明。制作与贡献见[规则指南](docs/PLAYBACK-RULES.md)。
 - **输入源功能因电视而异。** 支持时可从桌面进入 HDMI 等输入；其他电视可能需要到系统设置中切换。
+- **可选系统海报会联网。** Watch Next 规则须显式声明图片主机并由用户启用；来源能看到 IP 和图片路径。详见[隐私说明](PRIVACY.md)。
 - **天气需要联网。** 开启前会说明服务条件；当前免费天气服务适用于非商业使用。
 - **视频背景取决于电视的播放能力。** 不支持的视频可换成图片背景。
 
@@ -47,3 +48,5 @@
 [AI 定制指南](docs/CUSTOMIZATION.md) · [构建说明](docs/BUILD.md) · [贡献与反馈](CONTRIBUTING.md)
 
 源码采用 [MIT 许可](LICENSE)。[隐私说明](PRIVACY.md)、[素材与服务来源](THIRD_PARTY_NOTICES.md)、[发布前审查](docs/LEGAL-REVIEW.md)和[截图来源](docs/SCREENSHOTS.md)供需要了解细节的人查阅。
+
+继续播放规则可手动导入：[Netflix Watch Next](docs/playback-rules/netflix-watch-next.json)、[TCL 渠道 B 站](docs/playback-rules/bilibili-tcl.json)。使用条件、验证范围与内置同版本处理见[规则指南](docs/PLAYBACK-RULES.md)；规则不会默认开启，也不代表所有应用版本和电视均支持。

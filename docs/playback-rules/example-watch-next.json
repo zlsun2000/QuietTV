@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "id": "example.watch-next",
+  "name": "System Watch Next example",
+  "revision": 1,
+  "author": "QuietTV contributors",
+  "license": "MIT",
+  "description": "Template only: replace the package, version, signing identity and entry contract after observing the public system provider.",
+  "verification": {
+    "status": "emulator",
+    "notes": "Synthetic provider rows only; no real service playback claim."
+  },
+  "target": {
+    "package": "org.example.player",
+    "minVersionCode": 1,
+    "maxVersionCode": 1,
+    "minSdk": 26
+  },
+  "adapter": "watch_next",
+  "watchNext": {
+    "types": [
+      "continue"
+    ],
+    "intent": {
+      "action": "android.intent.action.VIEW",
+      "data": {
+        "scheme": "https",
+        "host": "example.invalid",
+        "path": [
+          "deeplink"
+        ],
+        "queryKeys": [
+          "payload"
+        ]
+      }
+    }
+  },
+  "fields": {
+    "id": {
+      "key": "providerIdHash",
+      "type": "id",
+      "required": true
+    },
+    "title": {
+      "key": "title",
+      "type": "text",
+      "required": true
+    },
+    "subtitle": {
+      "key": "episodeTitle",
+      "type": "text"
+    },
+    "position": {
+      "key": "position",
+      "type": "time",
+      "unit": "ms"
+    },
+    "duration": {
+      "key": "duration",
+      "type": "time",
+      "unit": "ms"
+    }
+  },
+  "identity": [
+    "id"
+  ],
+  "routes": [
+    {
+      "requires": [
+        "id"
+      ],
+      "capability": "native"
+    }
+  ]
+}

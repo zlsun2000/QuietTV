@@ -1,0 +1,501 @@
+{
+  "schema": 1,
+  "id": "quiettv.bili-tcl",
+  "name": "B 站 · TCL 渠道历史",
+  "revision": 1,
+  "author": "QuietTV contributors",
+  "license": "MIT",
+  "description": "已有 TCL 渠道历史广播与应用外部跳转接口。按应用接口匹配，可在其他提供相同契约的设备上验证。",
+  "verification": {
+    "status": "historical",
+    "notes": "旧开发电视曾验证；当前 Android 12 上的 B 站 1.7.7 尚未成功，未限定版本不代表全部版本受支持。"
+  },
+  "target": {
+    "package": "com.xiaodianshi.tv.yst"
+  },
+  "adapter": "broadcast",
+  "event": {
+    "add": "com.tv.history.add",
+    "delete": "com.tv.history.del.tolauncher",
+    "sourceFields": [
+      "packageName",
+      "srcApp"
+    ],
+    "sourceValues": [
+      "com.xiaodianshi.tv.yst",
+      "com.xiaodianshi.tv.yst.external"
+    ]
+  },
+  "fields": {
+    "id": {
+      "key": "videoId",
+      "type": "numeric",
+      "required": true
+    },
+    "episodeId": {
+      "key": "episodeId",
+      "type": "numeric"
+    },
+    "title": {
+      "key": "videoName",
+      "type": "text",
+      "required": true
+    },
+    "subtitle": {
+      "key": "episodeName",
+      "type": "text"
+    },
+    "position": {
+      "key": "currentPosition",
+      "type": "time",
+      "unit": "ms"
+    },
+    "duration": {
+      "key": "duration",
+      "type": "time",
+      "unit": "ms"
+    },
+    "variant": {
+      "key": "cmdInfo",
+      "type": "enum",
+      "values": [
+        "tcl/ugc",
+        "tcl/pgc",
+        "tcl/pugc"
+      ],
+      "required": true
+    }
+  },
+  "identity": [
+    "id",
+    "episodeId",
+    "variant"
+  ],
+  "routes": [
+    {
+      "when": {
+        "variant": [
+          "tcl/ugc"
+        ]
+      },
+      "requires": [
+        "episodeId",
+        "position"
+      ],
+      "capability": "position",
+      "intent": {
+        "action": "com.xiaodianshi.tv.yst.external",
+        "component": "com.xiaodianshi.tv.yst.ui.transition.TransitionActivity",
+        "extras": {
+          "type": {
+            "type": "string",
+            "value": "3"
+          },
+          "value": {
+            "type": "json",
+            "value": {
+              "isBangumi": {
+                "type": "string",
+                "value": "0"
+              },
+              "avId": {
+                "type": "string",
+                "field": "id"
+              },
+              "cId": {
+                "type": "string",
+                "field": "episodeId",
+                "optional": true
+              },
+              "progress": {
+                "type": "string",
+                "field": "position",
+                "unit": "s",
+                "optional": true
+              },
+              "forcePlayProgress": {
+                "type": "string",
+                "value": "1"
+              },
+              "fullScreenPlay": {
+                "type": "string",
+                "value": "1"
+              },
+              "stay": {
+                "type": "string",
+                "value": "0"
+              },
+              "home": {
+                "type": "string",
+                "value": "0"
+              }
+            }
+          },
+          "from": {
+            "type": "string",
+            "value": "quiettv"
+          },
+          "out": {
+            "type": "string",
+            "value": "1"
+          }
+        }
+      }
+    },
+    {
+      "when": {
+        "variant": [
+          "tcl/pgc"
+        ]
+      },
+      "requires": [
+        "episodeId",
+        "position"
+      ],
+      "capability": "position",
+      "intent": {
+        "action": "com.xiaodianshi.tv.yst.external",
+        "component": "com.xiaodianshi.tv.yst.ui.transition.TransitionActivity",
+        "extras": {
+          "type": {
+            "type": "string",
+            "value": "3"
+          },
+          "value": {
+            "type": "json",
+            "value": {
+              "isBangumi": {
+                "type": "string",
+                "value": "1"
+              },
+              "seasonId": {
+                "type": "string",
+                "field": "id"
+              },
+              "epId": {
+                "type": "string",
+                "field": "episodeId",
+                "optional": true
+              },
+              "progress": {
+                "type": "string",
+                "field": "position",
+                "unit": "s",
+                "optional": true
+              },
+              "forcePlayProgress": {
+                "type": "string",
+                "value": "1"
+              },
+              "fullScreenPlay": {
+                "type": "string",
+                "value": "1"
+              },
+              "stay": {
+                "type": "string",
+                "value": "0"
+              },
+              "home": {
+                "type": "string",
+                "value": "0"
+              }
+            }
+          },
+          "from": {
+            "type": "string",
+            "value": "quiettv"
+          },
+          "out": {
+            "type": "string",
+            "value": "1"
+          }
+        }
+      }
+    },
+    {
+      "when": {
+        "variant": [
+          "tcl/pugc"
+        ]
+      },
+      "requires": [
+        "episodeId",
+        "position"
+      ],
+      "capability": "position",
+      "intent": {
+        "action": "com.xiaodianshi.tv.yst.external",
+        "component": "com.xiaodianshi.tv.yst.ui.transition.TransitionActivity",
+        "extras": {
+          "type": {
+            "type": "string",
+            "value": "3"
+          },
+          "value": {
+            "type": "json",
+            "value": {
+              "isBangumi": {
+                "type": "string",
+                "value": "1"
+              },
+              "seasonId": {
+                "type": "string",
+                "field": "id"
+              },
+              "epId": {
+                "type": "string",
+                "field": "episodeId",
+                "optional": true
+              },
+              "progress": {
+                "type": "string",
+                "field": "position",
+                "unit": "s",
+                "optional": true
+              },
+              "forcePlayProgress": {
+                "type": "string",
+                "value": "1"
+              },
+              "fullScreenPlay": {
+                "type": "string",
+                "value": "1"
+              },
+              "stay": {
+                "type": "string",
+                "value": "0"
+              },
+              "home": {
+                "type": "string",
+                "value": "0"
+              },
+              "isClass": {
+                "type": "string",
+                "value": "1"
+              }
+            }
+          },
+          "from": {
+            "type": "string",
+            "value": "quiettv"
+          },
+          "out": {
+            "type": "string",
+            "value": "1"
+          }
+        }
+      }
+    },
+    {
+      "when": {
+        "variant": [
+          "tcl/ugc"
+        ]
+      },
+      "requires": [
+        "id"
+      ],
+      "capability": "content",
+      "intent": {
+        "action": "com.xiaodianshi.tv.yst.external",
+        "component": "com.xiaodianshi.tv.yst.ui.transition.TransitionActivity",
+        "extras": {
+          "type": {
+            "type": "string",
+            "value": "3"
+          },
+          "value": {
+            "type": "json",
+            "value": {
+              "isBangumi": {
+                "type": "string",
+                "value": "0"
+              },
+              "avId": {
+                "type": "string",
+                "field": "id"
+              },
+              "cId": {
+                "type": "string",
+                "field": "episodeId",
+                "optional": true
+              },
+              "progress": {
+                "type": "string",
+                "field": "position",
+                "unit": "s",
+                "optional": true
+              },
+              "forcePlayProgress": {
+                "type": "string",
+                "value": "1"
+              },
+              "fullScreenPlay": {
+                "type": "string",
+                "value": "1"
+              },
+              "stay": {
+                "type": "string",
+                "value": "0"
+              },
+              "home": {
+                "type": "string",
+                "value": "0"
+              }
+            }
+          },
+          "from": {
+            "type": "string",
+            "value": "quiettv"
+          },
+          "out": {
+            "type": "string",
+            "value": "1"
+          }
+        }
+      }
+    },
+    {
+      "when": {
+        "variant": [
+          "tcl/pgc"
+        ]
+      },
+      "requires": [
+        "id"
+      ],
+      "capability": "content",
+      "intent": {
+        "action": "com.xiaodianshi.tv.yst.external",
+        "component": "com.xiaodianshi.tv.yst.ui.transition.TransitionActivity",
+        "extras": {
+          "type": {
+            "type": "string",
+            "value": "3"
+          },
+          "value": {
+            "type": "json",
+            "value": {
+              "isBangumi": {
+                "type": "string",
+                "value": "1"
+              },
+              "seasonId": {
+                "type": "string",
+                "field": "id"
+              },
+              "epId": {
+                "type": "string",
+                "field": "episodeId",
+                "optional": true
+              },
+              "progress": {
+                "type": "string",
+                "field": "position",
+                "unit": "s",
+                "optional": true
+              },
+              "forcePlayProgress": {
+                "type": "string",
+                "value": "1"
+              },
+              "fullScreenPlay": {
+                "type": "string",
+                "value": "1"
+              },
+              "stay": {
+                "type": "string",
+                "value": "0"
+              },
+              "home": {
+                "type": "string",
+                "value": "0"
+              }
+            }
+          },
+          "from": {
+            "type": "string",
+            "value": "quiettv"
+          },
+          "out": {
+            "type": "string",
+            "value": "1"
+          }
+        }
+      }
+    },
+    {
+      "when": {
+        "variant": [
+          "tcl/pugc"
+        ]
+      },
+      "requires": [
+        "id"
+      ],
+      "capability": "content",
+      "intent": {
+        "action": "com.xiaodianshi.tv.yst.external",
+        "component": "com.xiaodianshi.tv.yst.ui.transition.TransitionActivity",
+        "extras": {
+          "type": {
+            "type": "string",
+            "value": "3"
+          },
+          "value": {
+            "type": "json",
+            "value": {
+              "isBangumi": {
+                "type": "string",
+                "value": "1"
+              },
+              "seasonId": {
+                "type": "string",
+                "field": "id"
+              },
+              "epId": {
+                "type": "string",
+                "field": "episodeId",
+                "optional": true
+              },
+              "progress": {
+                "type": "string",
+                "field": "position",
+                "unit": "s",
+                "optional": true
+              },
+              "forcePlayProgress": {
+                "type": "string",
+                "value": "1"
+              },
+              "fullScreenPlay": {
+                "type": "string",
+                "value": "1"
+              },
+              "stay": {
+                "type": "string",
+                "value": "0"
+              },
+              "home": {
+                "type": "string",
+                "value": "0"
+              },
+              "isClass": {
+                "type": "string",
+                "value": "1"
+              }
+            }
+          },
+          "from": {
+            "type": "string",
+            "value": "quiettv"
+          },
+          "out": {
+            "type": "string",
+            "value": "1"
+          }
+        }
+      }
+    }
+  ]
+}

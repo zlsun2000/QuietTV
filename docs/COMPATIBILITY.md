@@ -44,10 +44,14 @@ Netflix 补充排查：0.14.0-rc3/code 27 在用户授权后以正常 `READ_TV_L
 
 [AOSP 硬件实现](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-16.0.0_r3/services/core/java/com/android/server/tv/TvInputHardwareManager.java) 的 `getInputStateLocked` 可在未更新线缆状态时依据流配置返回连接，HDMI 热插拔未知/关闭也可报告待机。[逻辑设备实现](https://android.googlesource.com/platform/frameworks/base/+/master/services/core/java/com/android/server/tv/TvInputManagerService.java) 则根据 HDMI 设备电源状态更新子输入。0.13.3-test 因此单独处理逻辑设备状态与物理接入证据，标准物理端口未知时不显示已连接，也不凭缺少 CEC 条目断言未连接；这不是型号特判，不能保证检测所有 HDMI/AV 线缆或视频信号。
 
-当前开发电视没有可利用的 Watch Next Provider。首版不采集各平台账户的完整历史，也不绕过订阅、DRM、应用内广告或清晰度限制。
+2026-10-15/16 补查修正：当前 Android 12 电视有正常授权后可读取的系统 Watch Next，已显示两条 Netflix build 27207 记录；所有者确认原生入口点击可续播。旧 shell 查询无读取权限，不能据零结果断言没有提供者。新 watch_next JSON 按应用/版本/签名及公开契约匹配，没有 TCL 分支；其他版本与固件待测。首版不采集各平台账户的完整历史，也不绕过订阅、DRM、应用内广告或清晰度限制。
 
 ## 实机验收
 
 贡献适配时分别记录：全新安装、首次打开、Home、重启、休眠唤醒、遥控器全部功能、长按/排序/隐藏、左右滚动边界、背景导入与循环、拒绝权限、断网、升级保留配置、恢复原桌面。HDMI 实测应另列端口、接入/拔出、设备名可读性与实际切换；未知时就记未知。
 
 不要在别人正在看电视时发送按键、打开内容或重启。模拟器通过与厂商实测是两类证据。旧个人版本与公开版功能边界不同，见 CHANGELOG 和 LEGAL-REVIEW。
+
+0.14.0-rc12（code 36）在隔离 API 28/30 验证 Watch Next 合成来源与点击、重复占位隐藏和可选海报缓存。真实 Netflix 原生位置由应用决定，没有逐帧位置或资料隔离保证；网络海报另见 ARTWORK-REVIEW.md。API 23–25 不启用此来源，保留基础桌面及已有接入，当前增量未重跑这些 API 的设备套件。
+
+所有者在 2026-10-16 确认 Netflix 重复占位消失、两条系统海报在屏幕正常显示。原记录、收藏、背景、天气选择及用户 10 未安装状态已保留；此反馈不扩展为其他应用/固件兼容结论。

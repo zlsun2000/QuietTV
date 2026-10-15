@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "id": "quiettv.netflix-watch-next",
+  "name": "Netflix · 系统继续观看",
+  "revision": 1,
+  "author": "QuietTV contributors",
+  "license": "MIT",
+  "description": "读取 Netflix 主动发布的系统 Watch Next 继续观看记录，点击重新验证原生入口。可选下载其提供的海报；进度由 Netflix 决定。",
+  "verification": {
+    "status": "device",
+    "notes": "Android 12 / Netflix 13.2.1 build 27207：所有者确认点击可续播、重复占位已消失、封面已正常显示。未逐帧核验位置，未测试资料切换、冷启动或其他固件。"
+  },
+  "target": {
+    "package": "com.netflix.ninja",
+    "minVersionCode": 27207,
+    "maxVersionCode": 27207,
+    "minSdk": 26,
+    "certSha256": [
+      "363863596ea99241eb71b1a985553aa604de3ea3c5f0c546742390e682164e6b"
+    ]
+  },
+  "adapter": "watch_next",
+  "watchNext": {
+    "types": [
+      "continue"
+    ],
+    "intent": {
+      "action": "android.intent.action.VIEW",
+      "data": {
+        "scheme": "https",
+        "host": "www.netflix.com",
+        "path": [
+          "deeplink"
+        ],
+        "queryKeys": [
+          "payload"
+        ]
+      },
+      "component": "com.netflix.ninja.MainActivity"
+    },
+    "artwork": {
+      "source": "poster",
+      "httpsHosts": [
+        "*.nflxso.net"
+      ],
+      "queryKeys": [
+        "client",
+        "deviceTypeId",
+        "platform"
+      ]
+    }
+  },
+  "fields": {
+    "id": {
+      "key": "providerIdHash",
+      "type": "id",
+      "required": true
+    },
+    "title": {
+      "key": "title",
+      "type": "text",
+      "required": true
+    },
+    "subtitle": {
+      "key": "episodeTitle",
+      "type": "text"
+    },
+    "position": {
+      "key": "position",
+      "type": "time",
+      "unit": "ms"
+    },
+    "duration": {
+      "key": "duration",
+      "type": "time",
+      "unit": "ms"
+    }
+  },
+  "identity": [
+    "id"
+  ],
+  "routes": [
+    {
+      "requires": [
+        "id"
+      ],
+      "capability": "native"
+    }
+  ]
+}

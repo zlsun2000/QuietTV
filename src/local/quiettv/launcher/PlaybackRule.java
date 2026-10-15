@@ -20,7 +20,7 @@ final class PlaybackRule {
     PlaybackRule(String raw,boolean bundled)throws Exception {
         require(raw!=null&&raw.getBytes("UTF-8").length<=MAX_BYTES,"规则文件超过 64 KB");
         boundedJson(raw,16);json=new JSONObject(raw);builtin=bundled;
-        keys(json,"schema,id,name,revision,author,license,description,verification,target,adapter,event,fields,identity,routes");
+        keys(json,"schema,id,name,revision,author,license,description,verification,target,adapter,event,watchNext,fields,identity,routes");
         require(integer(json,"schema",-1)==1,"不支持的规则规范版本");
         id=string(json,"id",80);require(id.matches("[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+"),"规则 ID 格式不正确");
         name=string(json,"name",120);long version=integer(json,"revision",0);require(version>0&&version<=Integer.MAX_VALUE,"revision 必须为正整数");revision=(int)version;
@@ -32,7 +32,8 @@ final class PlaybackRule {
         long min=integer(target,"minVersionCode",0),max=integer(target,"maxVersionCode",Long.MAX_VALUE);require(min>=0&&max>=min,"应用版本范围不正确");
         require(integer(target,"minSdk",23)>=23&&integer(target,"maxSdk",1000)>=integer(target,"minSdk",23)&&integer(target,"maxSdk",1000)<=1000,"系统版本范围不正确");
         if(target.has("certSha256")){JSONArray certs=target.getJSONArray("certSha256");require(certs.length()>0&&certs.length()<=4,"签名数量不正确");for(int i=0;i<certs.length();i++)require(certs.getString(i).matches("[a-f0-9]{64}"),"签名应为小写 SHA-256");}
-        adapter=string(json,"adapter",32);require(adapter.equals("broadcast")||adapter.equals("media_session"),"未知接入适配器");
+        adapter=string(json,"adapter",32);require(Arrays.asList("broadcast","media_session","watch_next").contains(adapter),"未知接入适配器");
+        if(adapter.equals("watch_next")){WatchNextHistory.validate(json.getJSONObject("watchNext"));if(json.getJSONObject("watchNext").has("artwork")&&json.getJSONObject("watchNext").getJSONObject("artwork").getJSONArray("httpsHosts").length()>0)require(target.has("certSha256"),"联网封面必须限定目标应用签名");}else require(!json.has("watchNext"),"此适配器不支持 Watch Next 声明");
         String add="",del="";
         if(adapter.equals("broadcast")){
             JSONObject event=json.getJSONObject("event");keys(event,"add,delete,sourceFields,sourceValues");
@@ -46,6 +47,12 @@ final class PlaybackRule {
         addAction=add;deleteAction=del;fields=json.getJSONObject("fields");require(fields.length()<=8,"字段过多");
         keys(fields,"id,episodeId,title,subtitle,position,duration,variant,channel");require(fields.has("id")&&fields.has("title"),"缺少 id/title 映射");
         Iterator<String> names=fields.keys();while(names.hasNext())validateField(names.next());
+        if(adapter.equals("watch_next")){
+            require(fields.length()<=5,"Watch Next 只支持系统公开的五个规范字段");
+            String[][] mapping={{"id","providerIdHash"},{"title","title"},{"subtitle","episodeTitle"},{"position","position"},{"duration","duration"}};
+            HashSet<String> allowed=new HashSet<>();for(String[] item:mapping){allowed.add(item[0]);if(fields.has(item[0])){JSONObject spec=fields.getJSONObject(item[0]);keys(spec,"key,type,required,unit");require(spec.getString("key").equals(item[1]),"Watch Next 字段须使用规范键");if(item[0].equals("id"))require(spec.getString("type").equals("id"),"系统内容身份使用摘要");if(spec.has("unit"))require(spec.getString("unit").equals("ms"),"系统时间单位为 ms");}}
+            Iterator<String> nativeFields=fields.keys();while(nativeFields.hasNext())require(allowed.contains(nativeFields.next()),"不支持的 Watch Next 字段");
+        }
         identity=json.getJSONArray("identity");require(identity.length()>0&&identity.length()<=4,"内容标识不完整");
         HashSet<String> ids=new HashSet<>();for(int i=0;i<identity.length();i++){String field=identity.getString(i);require(Arrays.asList("id","episodeId","variant","channel").contains(field)&&fields.has(field)&&ids.add(field),"内容标识字段不正确或重复");}
         require(ids.contains("id"),"内容标识必须包含 id");
@@ -67,9 +74,10 @@ final class PlaybackRule {
         if(!Arrays.asList("id","title","subtitle","position","duration").contains(name))require(!type.equals("text"),"路由字段需要有界标识");
     }
     private void validateRoute(JSONObject route)throws Exception {
-        keys(route,"when,requires,capability,intent");String capability=route.getString("capability");require(capability.equals("content")||capability.equals("position"),"入口能力不正确");
+        keys(route,"when,requires,capability,intent");String capability=route.getString("capability");require(adapter.equals("watch_next")?capability.equals("native"):capability.equals("content")||capability.equals("position"),"入口能力不正确");
         if(route.has("when")){JSONObject when=route.getJSONObject("when");require(when.length()<=4,"条件过多");Iterator<String> keys=when.keys();while(keys.hasNext()){String field=keys.next();require(ROUTE_FIELDS.contains(field)&&fields.has(field),"条件字段不正确");JSONArray values=when.getJSONArray(field);require(values.length()>0&&values.length()<=12,"条件值数量不正确");for(int i=0;i<values.length();i++)require(token(values.getString(i)),"条件值不正确");}}
         if(route.has("requires")){JSONArray required=route.getJSONArray("requires");require(required.length()<=6,"必需字段过多");for(int i=0;i<required.length();i++)require(ROUTE_FIELDS.contains(required.getString(i))&&fields.has(required.getString(i)),"必需字段未定义");}
+        if(adapter.equals("watch_next")){require(!route.has("intent"),"系统入口由 Watch Next 声明限定，不能存入路由");return;}
         JSONObject intent=route.getJSONObject("intent");keys(intent,"action,component,data,extras");require(action(string(intent,"action",160)),"目标 action 不正确");
         // Channel application IDs may differ from their Java class namespace. The
         // ComponentName's package and PackageManager result enforce actual ownership.

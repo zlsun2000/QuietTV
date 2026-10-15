@@ -18,10 +18,18 @@ final class MediaArtwork {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private int pending;
     private boolean disposed;
+    private final HashMap<String,Long> nativeAttempts=new HashMap<>();
+    boolean captureWatchNext(PlaybackRecord record,PlaybackRule rule,String address){
+        if(disposed||!WatchNextHistory.eligible(app,rule))return false;String ref="localart:"+MediaRecordPolicy.digest(record.key());File saved=file(app,ref);if(saved!=null&&saved.isFile()&&System.currentTimeMillis()-saved.lastModified()<86400000){record.cover=ref;if(new HistoryStore(app).patchCover(record.key(),ref))GenericMediaHistory.changed(app);return true;}
+        long now=System.currentTimeMillis();Long previous=nativeAttempts.get(record.key());if(previous!=null&&now-previous<300000)return false;
+        if(nativeAttempts.size()>=32)nativeAttempts.clear();nativeAttempts.put(record.key(),now);
+        return capture(record,new MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_ART_URI,address).build(),rule);
+    }
     MediaArtwork(Context c){app=c.getApplicationContext();directory=new File(app.getCacheDir(),"media_artwork");directory.mkdirs();}
     static boolean local(String value){return value!=null&&value.matches("localart:[a-f0-9]{64}");}
     static File file(Context c,String reference){return local(reference)?new File(new File(c.getCacheDir(),"media_artwork"),reference.substring(9)):null;}
-    boolean capture(final PlaybackRecord record,MediaMetadata metadata){
+    boolean capture(final PlaybackRecord record,MediaMetadata metadata){return capture(record,metadata,null);}
+    private boolean capture(final PlaybackRecord record,MediaMetadata metadata,final PlaybackRule nativeRule){
         if(disposed||pending>=8||metadata==null)return false;
         Bitmap art=metadata.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);if(art==null)art=metadata.getBitmap(MediaMetadata.METADATA_KEY_ART);if(art==null)art=metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
         String address=metadata.getString(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI);if(address==null||address.isEmpty())address=metadata.getString(MediaMetadata.METADATA_KEY_ART_URI);if(address==null||address.isEmpty())address=metadata.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI);
@@ -29,11 +37,11 @@ final class MediaArtwork {
         final String ref="localart:"+MediaRecordPolicy.digest(record.key());final File target=file(app,ref);pending++;
         worker.execute(new Runnable(){public void run(){boolean saved=false;Bitmap image=null;try{
             {
-                image=bitmap;if(image==null)image=read(uri,record.source);if(image==null||image.isRecycled()||image.getWidth()<1||image.getHeight()<1)throw new IOException("No artwork");
+                image=bitmap;if(image==null)image=nativeRule!=null&&uri.startsWith("https:")?WatchNextArtwork.read(app,nativeRule,uri):read(uri,record.source);if(image==null||image.isRecycled()||image.getWidth()<1||image.getHeight()<1)throw new IOException("No artwork");
                 float scale=Math.min(1f,640f/Math.max(image.getWidth(),image.getHeight()));Bitmap output=Bitmap.createScaledBitmap(image,Math.max(1,(int)(image.getWidth()*scale)),Math.max(1,(int)(image.getHeight()*scale)),true);File temp=new File(target.getPath()+".tmp");try{try(FileOutputStream out=new FileOutputStream(temp)){if(!output.compress(Bitmap.CompressFormat.JPEG,88,out))throw new IOException("Cannot encode artwork");}if(target.exists()&&!target.delete())throw new IOException("Cannot replace artwork");saved=temp.renameTo(target);}finally{temp.delete();if(output!=image)output.recycle();}trim();
             }
         }catch(Exception e){android.util.Log.w("QuietTVMedia","Artwork unavailable: "+e.getClass().getSimpleName());}finally{if(image!=null&&image!=bitmap&&!image.isRecycled())image.recycle();}
-        final boolean success=saved;main.post(new Runnable(){public void run(){pending--;if(!disposed&&success&&new HistoryStore(app).patchCover(record.key(),ref))GenericMediaHistory.changed(app);}});
+        final boolean success=saved;main.post(new Runnable(){public void run(){pending--;if(!disposed&&success&&(nativeRule==null||WatchNextHistory.eligible(app,nativeRule))&&new HistoryStore(app).patchCover(record.key(),ref))GenericMediaHistory.changed(app);}});
         }});return true;
     }
     private Bitmap read(String text,String pkg) throws Exception {
