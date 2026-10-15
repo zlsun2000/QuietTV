@@ -20,6 +20,7 @@ final class Wallpapers {
     private volatile Future<?> pendingImport;
     private boolean importBusy;private int importGeneration;
     private FrameLayout layer;private PhotoView image;private TextureView texture;
+    private String attachedKey="";private boolean attachedMotion;
     private Bitmap cached;private String cachedKey="",loadingKey="";
     private MediaPlayer player;private Surface surface;private ValueAnimator motion;
     private boolean active=false,disposed=false,videoFailed=false;private String videoFailedPath="";
@@ -53,7 +54,12 @@ final class Wallpapers {
     static boolean video(File f){String n=f.getName().toLowerCase(java.util.Locale.ROOT);return n.matches(".*\\.(mp4|m4v|mkv|webm|mov)$");}
     static boolean picture(File f){String n=f.getName().toLowerCase(java.util.Locale.ROOT);return n.matches(".*\\.(jpg|jpeg|png|webp|bmp)$");}
     void attach(FrameLayout root,int theme){
-        release();image=null;texture=null;layer=new FrameLayout(owner);layer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);root.addView(layer,new FrameLayout.LayoutParams(-1,-1));layer.addView(new LandscapeView(owner,theme),new FrameLayout.LayoutParams(-1,-1));
+        String key=kind()+"|"+prefs.getString("wallpaper_path","")+"|"+theme;boolean moving=prefs.getBoolean("wallpaper_motion",true);
+        // Settings/history refreshes replace only the desktop controls. Keeping the attached
+        // TextureView preserves its Surface, decoder and last frame during those refreshes.
+        if(layer!=null&&layer.getParent()==root&&key.equals(attachedKey)){if(moving!=attachedMotion){attachedMotion=moving;animatePhoto();}return;}
+        release();if(layer!=null&&layer.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)layer.getParent()).removeView(layer);
+        attachedKey=key;attachedMotion=moving;image=null;texture=null;layer=new FrameLayout(owner);layer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);root.addView(layer,0,new FrameLayout.LayoutParams(-1,-1));layer.addView(new LandscapeView(owner,theme),new FrameLayout.LayoutParams(-1,-1));
         if(kind().equals("theme")){status();return;}
         image=new PhotoView(owner);layer.addView(image,new FrameLayout.LayoutParams(-1,-1));loadImage();
         if(kind().equals("video")){

@@ -10,7 +10,7 @@
 | `Wallpapers.java` / `WallpaperImportPolicy.java` | 图片/静音视频渲染；选定文件复制与大小限制 |
 | `HistoryStore.java` / `PlaybackRecord.java` | 本地记录、最多 8 项、去重、删除标记和真实操作标签 |
 | `MediaHistoryService.java` / `GenericMediaHistory.java` | 通过获准的 MediaSession 监听与当前会话恢复 |
-| `Bili*.java` / `Qiyi*.java` | 兼容历史广播、内容标识和固定应用入口；不访问平台目录 |
+| `PlaybackRule.java` / `PlaybackRules.java` / `RuleHistoryReceiver.java` | 有界声明式规则、导入/启停/回退、广播/会话映射、目标校验及续播；内置渠道规则在 `res/raw/rule_*.json` |
 | `Covers.java` / `MediaArtwork.java` | 媒体应用提供的 bitmap/所属 content provider，本地限额缓存；不下载网络封面 |
 | `WeatherRepository.java` / `WeatherButton.java` | 同意后查询天气，缓存与离线状态 |
 | `LocalMaintenanceReceiver.java` | 仅持系统 DUMP 权限的本地维护接口，不是公网服务 |
@@ -30,11 +30,15 @@
 
 添加媒体应用时先使用 MediaSession。专用适配必须保留目标包名、ID、命令与 URL 白名单，只接受匹配内容的元数据。不要从通知正文、日志、账号数据库、网络抓包或无障碍界面读历史。通用识别缺少永久路由时降级“打开应用”，不伪造精确续播。
 
-Android 8+ 的已有渠道历史隐式广播由 `LegacyHistoryListener` 在运行时接收，主页 Activity 和系统绑定的媒体监听服务共享注册并按所有者释放；不启动常驻服务。定向广播保留 manifest 接收，隐式事件避免重复处理，仍交给原有 B 站/奇异果校验器。进程不存活、应用没有发送契约或发送目标只允许原厂桌面时无法保证历史；注册接收器不等于应用已适配。每应用开关统一约束通用与渠道记录，关闭不删除旧记录。应用管理页的会话状态只是一刻的观测，不建立永久支持名单。
+`LegacyHistoryListener` 在所有支持系统按已启用规则注册广播，主页 Activity 和系统绑定的媒体监听服务共享注册并按所有者释放，不启动常驻服务。已有渠道 action 的定向广播保留 manifest 接收并避免重复；自定义 action 的 package-targeted 广播仍由运行时接收器处理。进程不存活、应用没有发送契约或仅允许原厂桌面时无法保证历史。每应用开关统一约束通用与渠道记录，关闭不删除旧记录。应用管理页的会话状态只是一刻的观测。
+
+规则接入与续播分开：广播提供规范化记录，标准会话可附加持久路由，执行层只构造固定目标包内的声明式 Intent。原始广播及来源声明不认证发送者，依然校验 ID/命令/字段，不存任意 Intent、URL 或脚本。旧渠道键与进度保留，更新/停用/回退不删记录。规范及能力边界见 [PLAYBACK-RULES.md](PLAYBACK-RULES.md)。
+
+桌面内容重建复用根视图与未变更的背景层，视频 TextureView、Surface 与解码器不因设置/历史刷新重建。背景选择改变时才更换渲染层，生命周期仍暂停/释放解码器。纵向视口由 `RowViewport` 在焦点行约束内选择能显示最多完整行的位置，左/右同带去重，卡片和标题仍只绘制完整行。
 
 ## 本地数据与迁移
 
-`home` preferences 保存收藏、分类顺序、主题、自定义背景路径和 Home 键修复开关；`playback_history` 保存 JSON 记录及开关；`weather` 的具体键由 WeatherRepository 管理。用户媒体位于本应用 external-files / files，缓存可丢弃，配置不能在更新时重置。
+`home` preferences 保存收藏、分类顺序、主题、自定义背景路径和 Home 键修复开关；`playback_history` 保存 JSON 记录及开关；`playback_rules` 保存本地规则、前版和启用选择；`weather` 的具体键由 WeatherRepository 管理。用户媒体位于本应用 external-files / files，缓存可丢弃，配置不能在更新时重置。维护导出包含规则，导入有界校验并兼容不含规则的旧备份。
 
 0.12.0 为 home 与 playback_history 增加 `config_schema=1`。发现旧 preferences 时保留字段及旧默认行为；全新记录 preferences 明确默认关闭 enabled/music_enabled/generic_enabled。迁移没有删除旧键，未知播放字段仍由宽容 JSON 读取处理。后续迁移应逐级、幂等、先判断存在性，并测试升级保留配置。
 

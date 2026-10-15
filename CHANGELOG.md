@@ -1,3 +1,11 @@
+# 0.14.0-rc1
+
+- Add local, modular playback rules: broadcast and MediaSession mappings, typed content/progress routes, app version/signature checks, opt-in JSON import, per-rule enable/disable, preflight diagnostics and one-version rollback. Move existing Bilibili/Qiyi routes into bundled JSON; retain legacy history identities, progress and choices. Include a schema, templates and an AI/community contribution guide. Rules cannot supply interfaces missing from the target app; current Bilibili 1.7.7 remains unverified.
+- Select vertical scroll positions that retain the focused row and maximize complete visible rows, including mixed favorites/history/grid layouts and repeated upward returns.
+- Preserve the root and video background layer across settings/history refreshes, avoiding decoder/Surface recreation and exposure of the builtin background. Lifecycle release and decoder failure fallback remain active.
+- Fit localized clock/date/brand text on one line and size toolbar labels around their icons; longer English labels and 12-hour periods no longer wrap or overlap.
+- Add isolated emulator regression tests for rule imports, routes, updates, rollback, history bounds, mixed-row navigation and real silent-video rendering. This is a local release candidate; OEM validation and public publication are separate steps.
+
 # 0.13.3-test
 
 - Stop presenting ambiguous Android hardware stream/hotplug states as a confirmed cable connection. Standard HDMI and AV ports without logical device evidence show an unconfirmed status and remain selectable; non-CEC devices are not assumed to be unplugged.

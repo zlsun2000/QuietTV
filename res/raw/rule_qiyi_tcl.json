@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "id": "quiettv.qiyi-tcl",
+  "name": "奇异果 · TCL 渠道历史",
+  "revision": 1,
+  "author": "QuietTV contributors",
+  "license": "MIT",
+  "description": "已有渠道广播提供记录，通过应用详情接口打开对应内容。",
+  "verification": {
+    "status": "historical",
+    "notes": "历史合成事件和记录已验证；真实精确位置续播未验证，本规则仅声明打开内容。"
+  },
+  "target": {
+    "package": "com.tcl.qiyiguo"
+  },
+  "adapter": "broadcast",
+  "event": {
+    "add": "com.tv.history.add",
+    "delete": "com.tv.history.del.tolauncher",
+    "sourceFields": [
+      "packageName"
+    ],
+    "sourceValues": [
+      "com.tcl.qiyiguo"
+    ]
+  },
+  "fields": {
+    "id": {
+      "key": "videoId",
+      "equalsKey": "cmdInfo",
+      "equalsJsonKey": "videoId",
+      "type": "numeric",
+      "required": true
+    },
+    "episodeId": {
+      "key": "cmdInfo",
+      "jsonKey": "episodeId",
+      "type": "numeric",
+      "required": true
+    },
+    "title": {
+      "key": "videoName",
+      "type": "text",
+      "required": true
+    },
+    "subtitle": {
+      "key": "episodeName",
+      "type": "text"
+    },
+    "position": {
+      "key": "currentPosition",
+      "type": "time",
+      "unit": "ms"
+    },
+    "duration": {
+      "key": "duration",
+      "type": "time",
+      "unit": "s"
+    },
+    "channel": {
+      "key": "cmdInfo",
+      "jsonKey": "chnId",
+      "type": "id",
+      "default": "0"
+    }
+  },
+  "identity": [
+    "id",
+    "episodeId"
+  ],
+  "routes": [
+    {
+      "requires": [
+        "id",
+        "episodeId",
+        "channel"
+      ],
+      "capability": "content",
+      "intent": {
+        "action": "com.tcl.qiyiguo.action.ACTION_DETAIL",
+        "extras": {
+          "playInfo": {
+            "type": "json",
+            "value": {
+              "playType": {
+                "type": "string",
+                "value": "history"
+              },
+              "videoId": {
+                "type": "string",
+                "field": "id"
+              },
+              "episodeId": {
+                "type": "string",
+                "field": "episodeId"
+              },
+              "history": {
+                "type": "int",
+                "value": -1
+              },
+              "customer": {
+                "type": "string",
+                "value": "tcl"
+              },
+              "chnId": {
+                "type": "int",
+                "field": "channel"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

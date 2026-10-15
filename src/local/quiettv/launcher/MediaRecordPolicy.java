@@ -32,7 +32,7 @@ final class MediaRecordPolicy {
         String name=record.sourceLabel==null||record.sourceLabel.isEmpty()?record.source:record.sourceLabel;
         return !record.title.isEmpty()&&!record.title.equals(name);
     }
-    static boolean sameItem(PlaybackRecord a,PlaybackRecord b){if(!a.generic()||!b.generic()||!a.source.equals(b.source)||!a.title.equals(b.title))return false;if(!a.contentId.isEmpty()&&!b.contentId.isEmpty())return a.contentId.equals(b.contentId)&&(a.episode.equals(b.episode)||a.episode.isEmpty()||b.episode.isEmpty())&&(a.album.equals(b.album)||a.album.isEmpty()||b.album.isEmpty());return a.episode.equals(b.episode)&&a.album.equals(b.album);}
+    static boolean sameItem(PlaybackRecord a,PlaybackRecord b){if(!a.generic()||!b.generic()||a.configured()||b.configured()||!a.source.equals(b.source)||!a.title.equals(b.title))return false;if(!a.contentId.isEmpty()&&!b.contentId.isEmpty())return a.contentId.equals(b.contentId)&&(a.episode.equals(b.episode)||a.episode.isEmpty()||b.episode.isEmpty())&&(a.album.equals(b.album)||a.album.isEmpty()||b.album.isEmpty());return a.episode.equals(b.episode)&&a.album.equals(b.album);}
     static void retainIdentity(PlaybackRecord record,PlaybackRecord old){if(!sameItem(record,old))return;record.videoId=old.videoId;if(record.contentId.isEmpty())record.contentId=old.contentId;if(record.episode.isEmpty())record.episode=old.episode;if(record.album.isEmpty())record.album=old.album;}
     private MediaRecordPolicy(){}
 }

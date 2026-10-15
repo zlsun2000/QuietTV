@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "id": "example.player-session",
+  "name": "示例播放器 · 媒体会话路由",
+  "revision": 1,
+  "author": "Your name",
+  "license": "MIT",
+  "description": "这是虚构协议模板，请按目标应用实际公开的契约修改；不能直接适配某个真实应用。",
+  "verification": {
+    "status": "unverified",
+    "notes": "尚未验证。贡献时填写应用版本、系统、设备与实际续播结果。"
+  },
+  "target": {
+    "package": "org.example.player",
+    "minVersionCode": 1,
+    "maxVersionCode": 1
+  },
+  "adapter": "media_session",
+  "fields": {
+    "id": {
+      "key": "mediaId",
+      "type": "id",
+      "required": true
+    },
+    "title": {
+      "key": "title",
+      "type": "text",
+      "required": true
+    },
+    "position": {
+      "key": "position",
+      "type": "time",
+      "unit": "ms"
+    },
+    "duration": {
+      "key": "duration",
+      "type": "time",
+      "unit": "ms"
+    }
+  },
+  "identity": [
+    "id"
+  ],
+  "routes": [
+    {
+      "requires": [
+        "id",
+        "position"
+      ],
+      "capability": "position",
+      "intent": {
+        "action": "org.example.player.RESUME",
+        "component": "org.example.player.PlayerActivity",
+        "extras": {
+          "contentId": {
+            "type": "string",
+            "field": "id"
+          },
+          "positionSeconds": {
+            "type": "long",
+            "field": "position",
+            "unit": "s"
+          }
+        }
+      }
+    },
+    {
+      "requires": [
+        "id"
+      ],
+      "capability": "content",
+      "intent": {
+        "action": "android.intent.action.VIEW",
+        "data": {
+          "scheme": "exampleplayer",
+          "host": "watch",
+          "path": [
+            {
+              "type": "string",
+              "field": "id"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

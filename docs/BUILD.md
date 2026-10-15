@@ -49,3 +49,5 @@ bash build.sh
 CI 会从干净检出构建，使用临时密钥运行核心检查，并在独立 Android 模拟器核对全新安装与 HOME。维护者从 Releases 发布固定签名 APK；CI 不持有发布私钥。
 
 公开源码与构建排除音乐补丁、账号工具和专用续播层。`tests/media-fixture/` 用于明确授权的媒体回调验证，不能把测试应用、测试记录或音频自动安装到用户电视。
+
+Windows PowerShell 7 可使用 `tests/device/run.ps1` 测试已明确创建的可丢弃 Android TV 模拟器。指定 `-Sdk`、`-JavaBin`、`-Keystore`、`-Serial emulator-5570` 和该模拟器使用的 `-ServerPort`；默认独立端口为 5041。签名密码沿用构建环境变量。`fresh` 清除该模拟器中的静幕数据，随后 `upgrade` 覆盖安装并验证保留；`rules` 测规则，`display` 测混排导航和本地编码的静音视频。首轮编译检查 APK，未修改源码和测试时后续轮次可用 `-ReuseChecks`。脚本拒绝非 emulator 序列号及非虚拟系统；不要对使用中的设备运行。文本和私有截图放在忽略的 `emulator-local/`，镜像/AVD/测试 APK 不提交 Git。CI 的 Linux 脚本同样执行这些场景；模拟器不能代表 OEM 或真实媒体应用续播成功。

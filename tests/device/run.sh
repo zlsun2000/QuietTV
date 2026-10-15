@@ -88,7 +88,7 @@ adb_device shell settings put secure tv_user_setup_complete 1
 adb_device shell input keyevent 82
 adb_device install -r "$project_root/QuietTV.apk"
 android_jar="$sdk_root/platforms/android-28/android.jar"
-"$build_tools/aapt" package -f -M "$project_root/tests/device/AndroidManifest.xml" -I "$android_jar" -J "$out_dir/gen" -F "$out_dir/resources.apk"
+"$build_tools/aapt" package -f -M "$project_root/tests/device/AndroidManifest.xml" -A "$project_root/docs/playback-rules" -I "$android_jar" -J "$out_dir/gen" -F "$out_dir/resources.apk"
 find "$project_root/tests/device/src" -name '*.java' -print0 | xargs -0 javac --release 8 -encoding UTF-8 -classpath "$project_root/build/classes:$android_jar" -d "$out_dir/classes"
 jar cf "$out_dir/classes.jar" -C "$out_dir/classes" .
 java -cp "$build_tools/lib/d8.jar" com.android.tools.r8.D8 --lib "$android_jar" --classpath "$project_root/build/classes.jar" --min-api 23 --output "$out_dir/dex" "$out_dir/classes.jar"
@@ -111,6 +111,14 @@ for phase in fresh upgrade; do
   fi
   timeout 120s "$adb_bin" -s "$serial" shell am instrument -w -e phase "$phase" local.quiettv.checks/local.quiettv.launcher.DeviceChecks | tee "$project_root/build/ci-artifacts/$phase.txt"
   grep -q "INSTRUMENTATION_RESULT: passed=$phase:" "$project_root/build/ci-artifacts/$phase.txt"
+done
+# Feature regressions use only synthetic apps, IDs, metadata and a locally encoded silent video.
+for scenario in rules display; do
+  adb_device shell am force-stop local.quiettv.launcher
+  runner=RuleChecks
+  if [[ "$scenario" == display ]]; then runner=DisplayChecks; fi
+  timeout 240s "$adb_bin" -s "$serial" shell am instrument -w "local.quiettv.checks/local.quiettv.launcher.$runner" | tee "$project_root/build/ci-artifacts/$scenario.txt"
+  grep -q 'INSTRUMENTATION_RESULT: passed=' "$project_root/build/ci-artifacts/$scenario.txt"
 done
 if [[ "${QUIETTV_DOCUMENTATION_CAPTURE:-0}" == 1 ]]; then
   [[ "$image" == 'system-images;android-28;android-tv;x86' ]] || { echo 'Documentation capture requires the isolated API 28 image' >&2; exit 1; }

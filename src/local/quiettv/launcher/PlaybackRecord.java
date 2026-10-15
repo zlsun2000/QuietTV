@@ -7,6 +7,8 @@ final class PlaybackRecord {
     String source=PACKAGE,album="",sourceLabel="",contentId="",routeId="",routeChannel="0";
     boolean audio;
     String videoId="",episodeId="",title="",episode="",cover="",command="";
+    String ruleId="";
+    java.util.Map<String,String> ruleData=new java.util.LinkedHashMap<>();
     long position,duration,updated,metadataAt,startedAt;
     boolean positionKnown=true;
     /** Only records received over the verified TCL protocol use the TCL route. */
@@ -15,8 +17,10 @@ final class PlaybackRecord {
     boolean generic(){return !bili()&&!apple();}
     boolean music(){return apple()||(generic()&&audio);}
     String service(){return apple()?"Apple Music":bili()?"B 站":sourceLabel.isEmpty()?source:sourceLabel;}
-    String key(){return apple()?"applemusic|"+videoId:generic()?"generic|"+source+"|"+videoId:command+"|"+videoId+"|"+episodeId;}
-    boolean valid(){return !title.isEmpty()&&title.length()<=240&&(apple()?musicId(videoId):bili()?numeric(videoId)&&(episodeId.isEmpty()||numeric(episodeId)):MediaRecordPolicy.packageName(source)&&sourceLabel.length()<=160&&episode.length()<=160&&album.length()<=160&&videoId.matches("[a-f0-9]{64}")&&(contentId.isEmpty()||contentId.matches("[a-f0-9]{64}"))&&(command.equals("media/session")||(command.equals("media/qiyi")&&QiyiRoute.valid(this))));}
+    boolean configured(){return command.equals("rule/broadcast");}
+    String key(){return apple()?"applemusic|"+videoId:configured()?"rule|"+source+"|"+videoId:generic()?"generic|"+source+"|"+videoId:command+"|"+videoId+"|"+episodeId;}
+    boolean valid(){return ruleFieldsValid()&&!title.isEmpty()&&title.length()<=240&&(apple()?musicId(videoId):bili()?numeric(videoId)&&(episodeId.isEmpty()||numeric(episodeId)):MediaRecordPolicy.packageName(source)&&sourceLabel.length()<=160&&episode.length()<=160&&album.length()<=160&&videoId.matches("[a-f0-9]{64}")&&(contentId.isEmpty()||contentId.matches("[a-f0-9]{64}"))&&(command.equals("media/session")||(configured()&&!ruleId.isEmpty()&&ruleData.containsKey("id"))||(command.equals("media/qiyi")&&QiyiRoute.valid(this))));}
+    private boolean ruleFieldsValid(){if(!ruleId.isEmpty()&&!ruleId.matches("[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+"))return false;if(ruleId.length()>80||ruleData.size()>4)return false;for(java.util.Map.Entry<String,String> item:ruleData.entrySet())if(!java.util.Arrays.asList("id","episodeId","variant","channel").contains(item.getKey())||!PlaybackRule.token(item.getValue()))return false;return true;}
     boolean canResume(){return valid()&&bili()&&!episodeId.isEmpty();}
     String actionLabel(){return apple()?"打开应用":canResume()?"继续播放":generic()&&!command.equals("media/qiyi")?"打开应用":"打开内容";}
     void inheritMetadata(PlaybackRecord old){if(!key().equals(old.key()))return;if(bili()&&old.metadataAt>0&&old.metadataAt>=metadataAt){episode=old.episode;if(!old.cover.isEmpty())cover=old.cover;}else{if(episode.isEmpty())episode=old.episode;if(cover.isEmpty())cover=old.cover;}if(generic()){if(!positionKnown&&old.positionKnown){position=old.position;positionKnown=true;}if(duration==0)duration=old.duration;}metadataAt=Math.max(metadataAt,old.metadataAt);}

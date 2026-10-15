@@ -15,6 +15,8 @@
 
 布局的 720p/1080p/4K 比例经过 JVM 检查，原生 4K 缓冲区、低内存设备和非 16:9 设备仍需实测。跨设备报告要包含实际应用窗口分辨率，不能只写面板型号。
 
+2026-10-15，本地 0.14.0-rc1/code 25 干净构建、393 项 JVM 检查通过。Windows WHPX + 官方 Emulator 37.2.12 的独立 Android TV 9/API 28、11/API 30（均为 1920×1080）分别通过 30 项新装/遥控器/规则导入界面检查、11 项升级保留检查、47 项合成规则检查和 159 项显示检查。旧版能复现完整行容量不足及设置重建视频层；候选版覆盖 5/6 列、常用/历史/网格混排、多轮上下返回、视频真实出帧/循环及连续设置刷新。升级核对收藏、分类、背景、旧记录 ID/进度与规则启用选择。较长规则说明可用遥控器滚动，英文 12 小时时制不换行。API 30 首次安装由模拟器的 Play Protect 提示旧 target SDK，经单次确认继续安装；未改系统安全开关。默认 HOME 保持原厂选择，未测试接管。当前增量尚未在 API 23 本地运行，CI 场景已更新但未推送执行；本轮未连接所有者电视，真实 B 站/其他媒体应用、OEM 解码器与 HDMI 行为不由模拟器结果证明。
+
 已观察到部分 Google Android TV 镜像原厂 HOME 具有更高优先级：`set-home-activity` 返回成功，实际解析仍可能是原厂。CI 单独记录 HOME 组件和未执行/受限项目，不能把这些当作接管成功；公开版保留原桌面，不为接管而停用它。为此提供可选、默认关闭的 Home 键修复（无障碍服务过滤 Home 键），尚未在 Google TV 实机验证过滤是否生效，也未核对长按 Home 的固件快捷功能，不作兼容承诺。API 30 的 `dumpsys window windows` 不包含当前焦点字段，截图检查使用完整 `dumpsys window`，并要求实际前台窗口属于静幕。
 
 CI 保留 API 23/28/30 的电视镜像：Android 6 使用官方 720p 电视配置，9/11 使用 1080p。API 23/30 使用 [Google 官方存档](https://developer.android.com/studio/emulator_archive) 的 35.2.10 模拟器并核对官方 SHA-256，API 28 使用 SDK 安装的版本。旧 Android 6 镜像的 DMA 分配器在 1080p、720p 均发生内核崩溃，因此只对该模拟器关闭 GLDMA 加速传输；API 30 还出现过首次启动 ADB 离线。这些属于测试环境失败，不能记作桌面通过。界面含持续背景动画，设备检查等待窗口创建及实际绘制帧，不依赖全局消息队列空闲。私有截图由限定的模拟器 ADB 直接导出，并检查前台窗口和 PNG，避免 API 28 的 UiAutomation 连接超时及 API 30 的应用私有外部目录访问限制；兼容性 CI 的公开附件只保留文本日志。手动 README 截图流程仅导出隔离环境的离线桌面，人工检查后再加入文档。各次结果以 CI 日志为准，模拟器工具不进入 APK。
@@ -31,6 +33,8 @@ CI 保留 API 23/28/30 的电视镜像：Android 6 使用官方 720p 电视配�
 2026-10-13/14 所有者在当前 Android 12 电视使用 0.13.1-test 时报告 Netflix、YouTube 有桌面记录，B 站 `com.xiaodianshi.tv.yst` 1.7.7 无记录；没有受控验证内容、进度或续播。授权只读快照当时无 B 站活动会话，不能据此断言播放时也没有会话。0.13.2-test 增加标准会话状态快照，并修复 Android 8+ 兼容渠道隐式广播仅注册在 manifest 的接收缺口，仍需确认该版本 B 站是否发送现有契约；没有媒体接口的应用仍不能自动产生历史。背景导入尚未在该电视测试。
 
 2026-10-14 所有者反馈 0.13.2-test 的 B 站记录仍无效，按要求推迟后续调查；本轮 0.13.3-test 只修输入状态展示，不增加媒体来源或接口。
+
+0.14.0-rc1 把已有 B 站/奇异果映射与路由迁移为可选 JSON 规则，增加标准会话路由配置、导入/预检/回退及贡献规范。合成测试验证传参和存储，不代表当前 B 站 1.7.7 已适配；现有接口仍须由真实应用提供。见 [规则指南](PLAYBACK-RULES.md)。
 
 标准输入的父子合并及待机状态依据 [TvInputInfo](https://developer.android.com/reference/android/media/tv/TvInputInfo#getParentId()) 与 [TvInputManager](https://developer.android.com/reference/android/media/tv/TvInputManager#INPUT_STATE_CONNECTED_STANDBY) 的公开契约；渠道广播运行时注册依据 [Android 8 广播限制](https://developer.android.com/about/versions/oreo/background#broadcasts)。这些契约不保证固件准确报告连接状态、提供端口标签或实际允许切换。未提供关系时保留独立输入，未提供排序数字时保持稳定排序；无输入登记的盒子不生成假 HDMI 卡片。
 

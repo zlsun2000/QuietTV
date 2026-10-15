@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.quiettv.launcher" android:versionCode="24" android:versionName="0.13.3-test">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.quiettv.launcher" android:versionCode="25" android:versionName="0.14.0-rc1">
     <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -30,14 +30,11 @@
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/home_key_service" />
         </service>
         <receiver android:name=".LocalMaintenanceReceiver" android:exported="true" android:permission="android.permission.DUMP" />
-        <receiver android:name=".BiliHistoryReceiver" android:exported="true">
+        <receiver android:name=".RuleHistoryReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="com.tv.history.add" />
                 <action android:name="com.tv.history.del.tolauncher" />
             </intent-filter>
-        </receiver>
-        <receiver android:name=".QiyiHistoryReceiver" android:exported="true">
-            <intent-filter><action android:name="com.tv.history.add" /><action android:name="com.tv.history.del.tolauncher" /></intent-filter>
         </receiver>
         <activity android:name=".MainActivity" android:screenOrientation="landscape" android:exported="true" android:directBootAware="true">
             <intent-filter>

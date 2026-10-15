@@ -1,0 +1,757 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QuietTV playback rule v1",
+  "description": "Structure validation; the launcher also checks cross-references, target identity, size limits and installed routes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "name",
+    "revision",
+    "author",
+    "license",
+    "verification",
+    "target",
+    "adapter",
+    "fields",
+    "identity",
+    "routes"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "author": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "notes"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "unverified",
+            "historical",
+            "emulator",
+            "device"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package"
+      ],
+      "properties": {
+        "package": {
+          "type": "string",
+          "maxLength": 160,
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)+$",
+          "not": {
+            "const": "local.quiettv.launcher"
+          }
+        },
+        "minVersionCode": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxVersionCode": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minSdk": {
+          "type": "integer",
+          "minimum": 23
+        },
+        "maxSdk": {
+          "type": "integer",
+          "minimum": 23
+        },
+        "certSha256": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "adapter": {
+      "enum": [
+        "broadcast",
+        "media_session"
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "add",
+        "sourceFields",
+        "sourceValues"
+      ],
+      "properties": {
+        "add": {
+          "$ref": "#/$defs/action"
+        },
+        "delete": {
+          "$ref": "#/$defs/action"
+        },
+        "sourceFields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/key"
+          }
+        },
+        "sourceValues": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 169
+          }
+        }
+      }
+    },
+    "fields": {
+      "type": "object",
+      "additionalProperties": false,
+      "maxProperties": 8,
+      "required": [
+        "id",
+        "title"
+      ],
+      "properties": {
+        "id": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "id",
+                    "numeric",
+                    "enum"
+                  ]
+                },
+                "required": {
+                  "const": true
+                }
+              },
+              "required": [
+                "required"
+              ]
+            }
+          ]
+        },
+        "episodeId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "id",
+                    "numeric",
+                    "enum"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "title": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "text"
+                },
+                "required": {
+                  "const": true
+                }
+              },
+              "required": [
+                "required"
+              ]
+            }
+          ]
+        },
+        "subtitle": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "text"
+                }
+              }
+            }
+          ]
+        },
+        "position": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "time"
+                }
+              }
+            }
+          ]
+        },
+        "duration": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "time"
+                }
+              }
+            }
+          ]
+        },
+        "variant": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "id",
+                    "numeric",
+                    "enum"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "channel": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "id",
+                    "numeric",
+                    "enum"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "identity": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "contains": {
+        "const": "id"
+      },
+      "items": {
+        "enum": [
+          "id",
+          "episodeId",
+          "variant",
+          "channel"
+        ]
+      }
+    },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/route"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "adapter": {
+            "const": "broadcast"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "event"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "event"
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "key": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,159}$"
+    },
+    "action": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/key"
+        },
+        {
+          "pattern": "\\."
+        }
+      ]
+    },
+    "token": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_./~-]{0,127}$",
+      "not": {
+        "pattern": "\\.\\."
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "type"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "jsonKey": {
+          "$ref": "#/$defs/key"
+        },
+        "equalsKey": {
+          "$ref": "#/$defs/key"
+        },
+        "equalsJsonKey": {
+          "$ref": "#/$defs/key"
+        },
+        "type": {
+          "enum": [
+            "id",
+            "numeric",
+            "enum",
+            "text",
+            "time"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "default": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "$ref": "#/$defs/token"
+          }
+        },
+        "unit": {
+          "enum": [
+            "ms",
+            "s"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "time"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "unit"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "unit"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "enum"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "values"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "values"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "equalsJsonKey"
+            ]
+          },
+          "then": {
+            "required": [
+              "equalsKey"
+            ]
+          }
+        }
+      ]
+    },
+    "flatValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "string",
+            "int",
+            "long",
+            "boolean"
+          ]
+        },
+        "field": {
+          "enum": [
+            "id",
+            "episodeId",
+            "position",
+            "duration",
+            "variant",
+            "channel"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "integer",
+            "boolean"
+          ]
+        },
+        "unit": {
+          "enum": [
+            "ms",
+            "s"
+          ]
+        },
+        "optional": {
+          "type": "boolean"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "field"
+          ],
+          "not": {
+            "required": [
+              "value"
+            ]
+          }
+        },
+        {
+          "required": [
+            "value"
+          ],
+          "not": {
+            "required": [
+              "field"
+            ]
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "unit"
+            ]
+          },
+          "then": {
+            "required": [
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "enum": [
+                  "position",
+                  "duration"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "value": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/flatValue"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ],
+          "properties": {
+            "type": {
+              "const": "json"
+            },
+            "value": {
+              "type": "object",
+              "maxProperties": 20,
+              "propertyNames": {
+                "$ref": "#/$defs/key"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/flatValue"
+              }
+            },
+            "optional": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability",
+        "intent"
+      ],
+      "properties": {
+        "when": {
+          "type": "object",
+          "maxProperties": 4,
+          "propertyNames": {
+            "enum": [
+              "id",
+              "episodeId",
+              "position",
+              "duration",
+              "variant",
+              "channel"
+            ]
+          },
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 12,
+            "items": {
+              "$ref": "#/$defs/token"
+            }
+          }
+        },
+        "requires": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "enum": [
+              "id",
+              "episodeId",
+              "position",
+              "duration",
+              "variant",
+              "channel"
+            ]
+          }
+        },
+        "capability": {
+          "enum": [
+            "content",
+            "position"
+          ]
+        },
+        "intent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action"
+          ],
+          "properties": {
+            "action": {
+              "$ref": "#/$defs/action"
+            },
+            "component": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^[A-Za-z0-9_.$]+$"
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "scheme",
+                "host"
+              ],
+              "properties": {
+                "scheme": {
+                  "type": "string",
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9+.-]*$",
+                  "not": {
+                    "enum": [
+                      "file",
+                      "content",
+                      "javascript",
+                      "data",
+                      "intent",
+                      "http"
+                    ]
+                  }
+                },
+                "host": {
+                  "type": "string",
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9.-]+$"
+                },
+                "path": {
+                  "type": "array",
+                  "maxItems": 8,
+                  "items": {
+                    "$ref": "#/$defs/flatValue"
+                  }
+                },
+                "query": {
+                  "type": "object",
+                  "maxProperties": 20,
+                  "propertyNames": {
+                    "$ref": "#/$defs/key"
+                  },
+                  "additionalProperties": {
+                    "$ref": "#/$defs/flatValue"
+                  }
+                }
+              }
+            },
+            "extras": {
+              "type": "object",
+              "maxProperties": 20,
+              "propertyNames": {
+                "$ref": "#/$defs/key"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/value"
+              }
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "component"
+              ]
+            },
+            {
+              "required": [
+                "data"
+              ]
+            },
+            {
+              "required": [
+                "extras"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

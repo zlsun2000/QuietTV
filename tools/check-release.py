@@ -57,9 +57,12 @@ if args.apk:
             name=item.filename
             if not (name in ('AndroidManifest.xml','resources.arsc','classes.dex') or name.startswith(('res/','META-INF/'))):
                 errors.append(('APK/'+name,'unexpected package entry'))
-            if name.endswith(('.apk','.jks','.keystore','.mp4','.webm','.json')):
+            rule_resource=name in ('res/raw/rule_bili_tcl.json','res/raw/rule_qiyi_tcl.json')
+            if name.endswith(('.apk','.jks','.keystore','.mp4','.webm','.json')) and not rule_resource:
                 errors.append(('APK/'+name,'private/third-party package payload'))
             data=package.read(item)
+            if rule_resource and data!=(root/name).read_bytes():
+                errors.append(('APK/'+name,'bundled rule differs from reviewed source'))
             for label,pattern in patterns:
                 if re.search(pattern,data):errors.append(('APK/'+name,label))
             if name.endswith('.dex'):

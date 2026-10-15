@@ -1,7 +1,12 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.quiettv.checks">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.quiettv.checks" android:versionCode="1" android:versionName="1">
     <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28" />
+    <uses-permission android:name="local.quiettv.launcher.permission.INTERNAL" />
     <application android:label="QuietTV isolated checks">
         <provider android:name="local.quiettv.launcher.CheckDocuments" android:authorities="local.quiettv.checks.documents" android:exported="true" />
+        <activity android:name="local.quiettv.checks.RuleTargetActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LEANBACK_LAUNCHER" /></intent-filter></activity>
+        <activity-alias android:name="local.quiettv.channel.ResumeAlias" android:targetActivity="local.quiettv.checks.RuleTargetActivity" android:exported="true" />
     </application>
     <instrumentation android:name="local.quiettv.launcher.DeviceChecks" android:targetPackage="local.quiettv.launcher" />
+    <instrumentation android:name="local.quiettv.launcher.DisplayChecks" android:targetPackage="local.quiettv.launcher" />
+    <instrumentation android:name="local.quiettv.launcher.RuleChecks" android:targetPackage="local.quiettv.launcher" />
 </manifest>
