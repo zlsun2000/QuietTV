@@ -27,6 +27,26 @@ public final class DeviceChecks extends Instrumentation {
     }
     private String resolvedHome(Context c){android.content.pm.ResolveInfo resolved=c.getPackageManager().resolveActivity(SystemEntrypoints.homeQuery(),android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);return resolved==null||resolved.activityInfo==null?"none":resolved.activityInfo.packageName+"/"+resolved.activityInfo.name;}
     private Object field(Object owner,String name)throws Exception{Field f=owner.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(owner);}
+    private void checkClock(MainActivity activity)throws Exception{
+        // Package discovery can replace desktop controls after initial startup.
+        // Exercise that transition and inspect the current clock only after layout.
+        runOnMainSync(activity::render);
+        final boolean[] ready={false},fits={false};final String[] measured={"no layout"};
+        long deadline=SystemClock.uptimeMillis()+8000;
+        while(SystemClock.uptimeMillis()<deadline){
+            awaitFrames(activity);
+            runOnMainSync(()->{try{android.widget.TextView clock=(android.widget.TextView)field(activity,"clock");
+                if(clock==null)return;
+                float width=clock.getPaint().measureText(clock.getText().toString());
+                ready[0]=clock.getWidth()>0&&clock.getLayout()!=null&&!clock.isLayoutRequested();
+                fits[0]=clock.getLineCount()==1&&width<=clock.getWidth()+1;
+                measured[0]="width="+clock.getWidth()+", lines="+clock.getLineCount()+", textWidth="+width+", laidOut="+ready[0];
+            }catch(Exception e){throw new RuntimeException(e);}});
+            if(ready[0])break;
+            Thread.sleep(50);
+        }
+        check(ready[0]&&fits[0],"localized clock including a 12-hour period fits on one line ("+measured[0]+")");
+    }
     private View named(View root,String text){if(root instanceof android.widget.TextView&&text.equals(((android.widget.TextView)root).getText().toString()))return root;if(root instanceof ViewGroup)for(int i=0;i<((ViewGroup)root).getChildCount();i++){View result=named(((ViewGroup)root).getChildAt(i),text);if(result!=null)return result;}return null;}
     private void ruleUi(MainActivity activity)throws Exception {
         PlaybackRules registry=PlaybackRules.get(activity);JSONObject longRule=new JSONObject(registry.find(PlaybackRule.BILI).json.toString());StringBuilder words=new StringBuilder();for(int i=0;i<600;i++)words.append('测');longRule.put("description",words.toString());longRule.getJSONObject("verification").put("notes",words.toString());PlaybackRule parsed=registry.parse(longRule.toString());
@@ -90,7 +110,7 @@ public final class DeviceChecks extends Instrumentation {
             weather.start();check(!weather.loading(),"service consent alone never forecasts a city the user has not selected");
             weather.dispose();weatherPrefs.edit().clear().commit();
             check(!GenericMediaHistory.permission(c),"basic desktop requires no media grant");
-            final boolean[] clockFits={false};runOnMainSync(()->{try{android.widget.TextView clock=(android.widget.TextView)field(activity,"clock");clockFits[0]=clock.getLineCount()==1&&clock.getPaint().measureText(clock.getText().toString())<=clock.getWidth()+1;}catch(Exception e){throw new RuntimeException(e);}});check(clockFits[0],"localized clock including a 12-hour period fits on one line");
+            checkClock(activity);
             ruleUi(activity);awaitFrames(activity);Thread.sleep(200);awaitFrames(activity);
             HistoryStore records=new HistoryStore(c);records.enabled(true);records.appEnabled(PlaybackRecord.PACKAGE,false);
             PlaybackRecord legacy=new PlaybackRecord();legacy.videoId="123456";legacy.episodeId="789";legacy.command="tcl/ugc";legacy.title="Synthetic blocked legacy item";legacy.updated=System.currentTimeMillis();
