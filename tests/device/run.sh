@@ -119,7 +119,11 @@ for scenario in rules display settings; do
   runner=RuleChecks
   if [[ "$scenario" == display ]]; then runner=DisplayChecks; fi
   if [[ "$scenario" == settings ]]; then runner=SettingsChecks; fi
-  timeout 240s "$adb_bin" -s "$serial" shell am instrument -w "local.quiettv.checks/local.quiettv.launcher.$runner" | tee "$project_root/build/ci-artifacts/$scenario.txt"
+  # Six mixed-layout scenarios plus real software video decode can exceed four
+  # minutes on API 30 hosted runners. Keep a finite scenario and job deadline.
+  scenario_timeout=240
+  if [[ "$scenario" == display ]]; then scenario_timeout=360; fi
+  timeout "${scenario_timeout}s" "$adb_bin" -s "$serial" shell am instrument -w "local.quiettv.checks/local.quiettv.launcher.$runner" | tee "$project_root/build/ci-artifacts/$scenario.txt"
   grep -q 'INSTRUMENTATION_RESULT: passed=' "$project_root/build/ci-artifacts/$scenario.txt"
   if [[ "$scenario" == rules ]] && [[ "$(adb_device shell getprop ro.build.version.sdk | tr -d '\r')" -ge 26 ]]; then
     (

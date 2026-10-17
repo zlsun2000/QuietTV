@@ -28,7 +28,7 @@ function Guest {
     try{
         if(-not $process.Start()){throw 'Cannot start emulator command'}
         $outputTask=$process.StandardOutput.ReadToEndAsync();$errorTask=$process.StandardError.ReadToEndAsync()
-        $timeout=if($args.Count -ge 3 -and $args[0] -eq 'shell' -and $args[2] -eq 'instrument'){240000}else{60000}
+        $timeout=if($args.Count -ge 3 -and $args[0] -eq 'shell' -and $args[2] -eq 'instrument'){if([string]$args[-1] -like '*/local.quiettv.launcher.DisplayChecks'){360000}else{240000}}else{60000}
         if(-not $process.WaitForExit($timeout)){$process.Kill();throw 'Emulator command timed out'}
         $output=$outputTask.GetAwaiter().GetResult();$errorText=$errorTask.GetAwaiter().GetResult()
         if($process.ExitCode -ne 0){throw "Emulator command failed: $($errorText.Trim())"}
