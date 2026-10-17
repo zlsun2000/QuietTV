@@ -428,7 +428,16 @@ public class MainActivity extends Activity {
         }return super.dispatchKeyEvent(e);
     }
     void moveApp(Tile tile,int code){ArrayList<App> list=groupApps(tile.group,manage);int index=-1;for(int i=0;i<list.size();i++)if(list.get(i).pkg.equals(tile.app.pkg))index=i;int step=code==21?-1:code==22?1:tile.group.row?0:code==19?-gridColumns:gridColumns;int next=index+step;if(index>=0&&step!=0&&next>=0&&next<list.size()){Collections.swap(list,index,next);saveOrder(tile.group,list);render();}}
-    void fitLine(TextView view,String value,int size,int width){view.setSingleLine(true);view.setEllipsize(TextUtils.TruncateAt.END);view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,sp(size));view.setText(value);float measured=view.getPaint().measureText(value);if(measured>dp(width))view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,sp(size)*dp(width)/measured);}
+    void fitLine(TextView view,String value,int size,int width){
+        view.setSingleLine(true);view.setEllipsize(TextUtils.TruncateAt.END);view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,sp(size));view.setText(value);
+        float available=Math.max(1,dp(width));
+        // Older Android fonts round glyph advances after a size change. A
+        // proportional estimate alone can still exceed the container by pixels.
+        for(int attempt=0;attempt<4;attempt++){
+            float measured=view.getPaint().measureText(value);if(measured<=available)break;
+            view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,Math.max(1,view.getTextSize()*Math.max(1,available-1)/measured));
+        }
+    }
     void tickClock(){Date now=new Date();if(clock!=null)fitLine(clock,DateFormat.getTimeFormat(this).format(now),ui.clockSize,200);if(dateLabel!=null){Locale locale=Locale.getDefault();String skeleton=getString(R.string.header_date_skeleton);String pattern=DateFormat.getBestDateTimePattern(locale,skeleton);fitLine(dateLabel,new SimpleDateFormat(pattern,locale).format(now),14,200);}}
 
     interface Choice {void pick(int index);}

@@ -46,6 +46,15 @@ public final class DeviceChecks extends Instrumentation {
             Thread.sleep(50);
         }
         check(ready[0]&&fits[0],"localized clock including a 12-hour period fits on one line ("+measured[0]+")");
+        final boolean[] variantsFit={true};
+        runOnMainSync(()->{try{android.widget.TextView clock=(android.widget.TextView)field(activity,"clock");
+            for(String label:new String[]{"10:08 AM","10:59 PM","12:58 AM","23:59"}){
+                activity.fitLine(clock,label,54,200);
+                if(clock.getPaint().measureText(label)>clock.getWidth())variantsFit[0]=false;
+            }
+            activity.tickClock();
+        }catch(Exception e){throw new RuntimeException(e);}});
+        check(variantsFit[0],"clock digit and period variants fit after actual font measurement");
     }
     private View named(View root,String text){if(root instanceof android.widget.TextView&&text.equals(((android.widget.TextView)root).getText().toString()))return root;if(root instanceof ViewGroup)for(int i=0;i<((ViewGroup)root).getChildCount();i++){View result=named(((ViewGroup)root).getChildAt(i),text);if(result!=null)return result;}return null;}
     private void ruleUi(MainActivity activity)throws Exception {
