@@ -68,8 +68,14 @@ public final class DisplayChecks extends Instrumentation {
         }
         Wallpapers wallpaper=(Wallpapers)field(a,"wallpapers");File video=SyntheticVideo.create(new File(c.getCacheDir(),"synthetic-wallpaper.mp4"));CountDownLatch imported=new CountDownLatch(1);final boolean[] ok={false};wallpaper.importFile(video,(success,isVideo)->{ok[0]=success&&isVideo;imported.countDown();});check(imported.await(10,TimeUnit.SECONDS)&&ok[0],"synthetic silent video imports");main(a::render);
         long deadline=SystemClock.uptimeMillis()+10000;while(SystemClock.uptimeMillis()<deadline){frames(a);final boolean[] ready={false};main(()->ready[0]=wallpaper.videoCapability().isAvailable());if(ready[0])break;}
-        final Object[] original=new Object[3];final long[] before={0};main(()->{original[0]=field(wallpaper,"layer");original[1]=field(wallpaper,"texture");original[2]=field(wallpaper,"player");before[0]=(Long)field(wallpaper,"videoFrames");});check(original[2]!=null&&before[0]>0,"video decoder produces actual frames");
-        for(int i=0;i<6;i++){main(()->{home.edit().putBoolean("banners",!home.getBoolean("banners",true)).commit();a.render();});frames(a);final boolean[] stable={false};main(()->stable[0]=original[0]==field(wallpaper,"layer")&&original[1]==field(wallpaper,"texture")&&original[2]==field(wallpaper,"player"));check(stable[0],"settings refresh "+i+" preserves video layer, Surface and decoder");}
+        final Object[] original=new Object[4];final long[] before={0};main(()->{original[0]=field(wallpaper,"layer");original[1]=field(wallpaper,"texture");original[2]=field(wallpaper,"surface");original[3]=field(wallpaper,"player");before[0]=(Long)field(wallpaper,"videoFrames");});check(original[3]!=null&&before[0]>0,"video decoder produces actual frames");
+        for(int i=0;i<6;i++){
+            // Cross a real playback boundary between settings changes. A completed
+            // round may legitimately replace its decoder, but render itself must not.
+            if(i==3)Thread.sleep(4500);
+            final boolean[] stable={false};main(()->{Object decoder=field(wallpaper,"player");home.edit().putBoolean("banners",!home.getBoolean("banners",true)).commit();a.render();stable[0]=decoder==field(wallpaper,"player");});
+            frames(a);main(()->stable[0]&=original[0]==field(wallpaper,"layer")&&original[1]==field(wallpaper,"texture")&&original[2]==field(wallpaper,"surface"));check(stable[0],"settings refresh "+i+" preserves the video layer and Surface, and keeps the decoder during render");
+        }
         Thread.sleep(4500);frames(a);final boolean[] playing={false};main(()->playing[0]=wallpaper.videoCapability().isAvailable()&&(Long)field(wallpaper,"videoFrames")>before[0]);check(playing[0],"video keeps producing frames after refreshes and a loop");
         result.putString(failures.isEmpty()?"passed":"failed",count+" display checks; failures="+failures.toString());finish(failures.isEmpty()?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);
     }catch(Throwable error){result.putString("failed",error.toString());finish(Activity.RESULT_CANCELED,result);}}
