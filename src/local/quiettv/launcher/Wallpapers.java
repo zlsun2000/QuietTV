@@ -25,17 +25,21 @@ final class Wallpapers {
     private MediaPlayer player;private Surface surface;private ValueAnimator motion;
     private boolean active=false,disposed=false,videoFailed=false;private String videoFailedPath="";
     private boolean videoReady=false;
-    private int videoLoops=0,videoEndFallbacks=0;
+    private int videoLoops=0,videoEndFallbacks=0,videoCompletions=0;
+    private int videoErrorWhat=0,videoErrorExtra=0;
     private long videoFrames=0;
     private final Handler videoHandler=new Handler(Looper.getMainLooper());
     // Some TV decoders stop at the last frame without sending completion.
     // Only inspect the tail after a full playback interval has elapsed.
     private final Runnable videoEndGuard=new Runnable(){public void run(){
         final MediaPlayer p=player;
-        if(p==null||!active||disposed||!videoReady)return;try{if(p.isLooping())return;}catch(Exception e){failedVideo();return;}
+        if(p==null||!active||disposed||!videoReady)return;
         try{int duration=p.getDuration(),position=p.getCurrentPosition();
             int margin=Math.min(1000,Math.max(100,duration/10));
-            if(duration>0&&position>=duration-margin){videoEndFallbacks++;repeatVideo(p);}
+            long stalled=android.os.SystemClock.uptimeMillis()-lastVideoFrameAt;
+            // isLooping() only echoes the requested setting. It does not prove
+            // that a TV decoder actually started another round or emitted frames.
+            if((!p.isPlaying()&&stalled>=500)||(duration>0&&position>=duration-margin&&stalled>=1500)){videoEndFallbacks++;repeatVideo(p);}
             else videoHandler.postDelayed(this,500);
         }catch(Exception e){if(player==p)failedVideo();}
     }};
@@ -101,22 +105,23 @@ final class Wallpapers {
         final PhotoView target=image;motion=ValueAnimator.ofFloat(0,1);motion.setDuration(45000);motion.setRepeatMode(ValueAnimator.REVERSE);motion.setRepeatCount(ValueAnimator.INFINITE);motion.setInterpolator(new android.view.animation.LinearInterpolator());motion.addUpdateListener(new ValueAnimator.AnimatorUpdateListener(){long last;public void onAnimationUpdate(ValueAnimator a){long now=android.os.SystemClock.uptimeMillis();if(now-last<33)return;last=now;target.setProgress((Float)a.getAnimatedValue());}});motion.start();
     }
     private void play(){
-        if(player!=null||!active||texture==null||!texture.isAvailable())return;String path=prefs.getString("wallpaper_path","");if(path.equals(videoFailedPath)){videoFailed=true;texture.setVisibility(View.GONE);return;}videoFailed=false;videoLoops=0;videoEndFallbacks=0;videoFrames=0;
+        if(player!=null||!active||texture==null||!texture.isAvailable())return;String path=prefs.getString("wallpaper_path","");if(path.equals(videoFailedPath)){videoFailed=true;texture.setVisibility(View.GONE);return;}videoFailed=false;videoLoops=0;videoEndFallbacks=0;videoCompletions=0;videoErrorWhat=0;videoErrorExtra=0;videoFrames=0;
         prepareVideo(false);
     }
     private void prepareVideo(final boolean repeating){
         if(player!=null||!active||disposed||texture==null||!texture.isAvailable())return;
-        try{if(surface==null)surface=new Surface(texture.getSurfaceTexture());player=new MediaPlayer();player.setSurface(surface);player.setDataSource(prefs.getString("wallpaper_path",""));player.setVolume(0,0);player.setLooping(true);
+        try{if(surface==null)surface=new Surface(texture.getSurfaceTexture());player=new MediaPlayer();player.setSurface(surface);player.setDataSource(prefs.getString("wallpaper_path",""));player.setVolume(0,0);player.setLooping(false);
             player.setOnPreparedListener(new MediaPlayer.OnPreparedListener(){public void onPrepared(MediaPlayer p){if(player!=p)return;videoHandler.removeCallbacks(videoPrepareGuard);try{videoReady=true;videoWidth=p.getVideoWidth();videoHeight=p.getVideoHeight();cropVideo();p.setVolume(0,0);if(active){p.start();if(repeating)videoLoops++;lastVideoFrameAt=android.os.SystemClock.uptimeMillis();guardVideoFrames=videoFrames;videoHandler.removeCallbacks(videoFrameGuard);videoHandler.postDelayed(videoFrameGuard,5000);armVideoEndGuard(p);}status();}catch(Exception e){if(player==p)failedVideo();}}});
-            player.setOnCompletionListener(new MediaPlayer.OnCompletionListener(){public void onCompletion(MediaPlayer p){repeatVideo(p);}});
-            player.setOnErrorListener(new MediaPlayer.OnErrorListener(){public boolean onError(MediaPlayer p,int what,int extra){if(player==p)failedVideo();return true;}});player.prepareAsync();videoHandler.postDelayed(videoPrepareGuard,20000);
+            player.setOnCompletionListener(new MediaPlayer.OnCompletionListener(){public void onCompletion(MediaPlayer p){if(player==p&&active&&!disposed&&videoReady){videoCompletions++;repeatVideo(p);}}});
+            player.setOnErrorListener(new MediaPlayer.OnErrorListener(){public boolean onError(MediaPlayer p,int what,int extra){if(player==p){videoErrorWhat=what;videoErrorExtra=extra;failedVideo();}return true;}});player.prepareAsync();videoHandler.postDelayed(videoPrepareGuard,20000);
         }catch(Exception e){failedVideo();}
     }
     private void armVideoEndGuard(MediaPlayer p){videoHandler.removeCallbacks(videoEndGuard);if(player==p&&active&&!disposed&&videoReady)videoHandler.postDelayed(videoEndGuard,Math.max(250L,(long)p.getDuration()+350L));}
     private void repeatVideo(MediaPlayer p){
         if(player!=p||!active||disposed||!videoReady)return;
-        // Native looping is the standard path. A completion callback is a bounded fallback
-        // for decoders that fail to honor setLooping(true).
+        // Some Amlogic video-only decoders fail native looping and acknowledge a
+        // seek without restarting output. Rebuild the decoder for every complete
+        // round, retaining the Surface and its last frame while preparing.
         releaseDecoder();prepareVideo(true);
     }
     private void cropVideo(){if(texture==null||videoWidth<=0||videoHeight<=0)return;float w=texture.getWidth(),h=texture.getHeight();if(w==0||h==0)return;float scale=Math.max(w/videoWidth,h/videoHeight);Matrix m=new Matrix();m.setScale(videoWidth*scale/w,videoHeight*scale/h,w/2,h/2);texture.setTransform(m);}
@@ -159,7 +164,7 @@ final class Wallpapers {
             if(!prefs.edit().putString("wallpaper_kind",isVideo?"video":"image").putString("wallpaper_path",dest.getCanonicalPath()).commit())throw new IOException();ok=true;
         }catch(Exception ignored){}finally{if(temp!=null)temp.delete();if(!ok&&dest!=null)dest.delete();finishImport(token,callback,ok,isVideo);}});
     }
-    void status(){try{File dir=owner.getExternalFilesDir(null);if(dir==null)return;String playing="false",looping="false",nativeLooping="false";int position=0,duration=0;try{if(player!=null&&videoReady){playing=String.valueOf(player.isPlaying());looping=String.valueOf(active&&!disposed);nativeLooping=String.valueOf(player.isLooping());position=player.getCurrentPosition();duration=player.getDuration();}}catch(Exception ignored){}try(Writer out=new FileWriter(new File(dir,"wallpaper-status.txt"))){out.write("kind="+kind()+"\nactive="+active+"\nphoto_motion="+(motion!=null&&motion.isRunning())+"\nvideo_playing="+playing+"\nvideo_looping="+looping+"\nvideo_native_looping="+nativeLooping+"\nvideo_loop_mode=native-with-completion-fallback\nvideo_loops="+videoLoops+"\nvideo_end_fallbacks="+videoEndFallbacks+"\nvideo_frames="+videoFrames+"\nvideo_position="+position+"\nvideo_duration="+duration+"\nvideo_muted=true\nvideo_failed="+videoFailed+"\nbitmap="+(cached==null?"none":cached.getWidth()+"x"+cached.getHeight())+"\n");}}catch(Exception ignored){}}
+    void status(){try{File dir=owner.getExternalFilesDir(null);if(dir==null)return;String playing="false",looping="false",nativeLooping="false";int position=0,duration=0;try{if(player!=null&&videoReady){playing=String.valueOf(player.isPlaying());looping=String.valueOf(active&&!disposed);nativeLooping=String.valueOf(player.isLooping());position=player.getCurrentPosition();duration=player.getDuration();}}catch(Exception ignored){}try(Writer out=new FileWriter(new File(dir,"wallpaper-status.txt"))){out.write("kind="+kind()+"\nactive="+active+"\nphoto_motion="+(motion!=null&&motion.isRunning())+"\nvideo_playing="+playing+"\nvideo_looping="+looping+"\nvideo_native_looping="+nativeLooping+"\nvideo_loop_mode=explicit-restart-with-tail-watchdog\nvideo_loops="+videoLoops+"\nvideo_completions="+videoCompletions+"\nvideo_error_what="+videoErrorWhat+"\nvideo_error_extra="+videoErrorExtra+"\nvideo_end_fallbacks="+videoEndFallbacks+"\nvideo_frames="+videoFrames+"\nvideo_position="+position+"\nvideo_duration="+duration+"\nvideo_muted=true\nvideo_failed="+videoFailed+"\nbitmap="+(cached==null?"none":cached.getWidth()+"x"+cached.getHeight())+"\n");}}catch(Exception ignored){}}
     private static final class Scrim extends View {private final Paint p=new Paint(3);Scrim(Activity a){super(a);}protected void onDraw(Canvas c){float w=getWidth(),h=getHeight();p.setShader(new LinearGradient(0,0,0,h,new int[]{0x30040b13,0x20040b13,0x80040b13,0xe6040b13},new float[]{0,.2f,.52f,1},Shader.TileMode.CLAMP));c.drawRect(0,0,w,h,p);p.setShader(null);}}
     private static final class PhotoView extends View {
         private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);private Bitmap bitmap;private float progress=-1;
