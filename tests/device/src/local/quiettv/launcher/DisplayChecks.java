@@ -22,6 +22,7 @@ public final class DisplayChecks extends Instrumentation {
     @SuppressWarnings("unchecked") private ArrayList<MainActivity.CardRow> rows(MainActivity a)throws Exception {return (ArrayList<MainActivity.CardRow>)field(a,"cardRows");}
     private int visible(MainActivity activity)throws Exception {int n=0;HashSet<android.graphics.Rect> bands=new HashSet<>();for(MainActivity.CardRow row:rows(activity))if(row.fullyVisible()&&bands.add(row.cardBounds()))n++;return n;}
     private void capacity(MainActivity a,String label)throws Exception {
+        main(()->{if(((ArrayList<?>)field(a,"apps")).size()!=42)throw new AssertionError("Synthetic layout fixture was replaced during "+label);});
         final int[] actual={0},expected={0};final boolean[] focused={false};main(()->{View focus=a.getCurrentFocus();actual[0]=visible(a);if(focus==null||!(focus.getParent() instanceof MainActivity.CardRow))return;MainActivity.CardRow row=(MainActivity.CardRow)focus.getParent();focused[0]=row.fullyVisible();android.graphics.Rect bounds=row.cardBounds();MainActivity.CardScroll scroll=(MainActivity.CardScroll)field(a,"scroll");View content=(View)field(a,"content");HashSet<android.graphics.Rect> bands=new HashSet<>();for(MainActivity.CardRow r:rows(a))bands.add(r.cardBounds());for(int y=Math.max(0,bounds.bottom-scroll.getHeight());y<=Math.min(bounds.top,content.getHeight()-scroll.getHeight());y++){int n=0;for(android.graphics.Rect r:bands)if(r.top>=y&&r.bottom<=y+scroll.getHeight())n++;expected[0]=Math.max(expected[0],n);}});
         if(!focused[0]||actual[0]!=expected[0])main(()->{View focus=a.getCurrentFocus();MainActivity.CardScroll scroll=(MainActivity.CardScroll)field(a,"scroll");Bundle diagnostic=new Bundle();diagnostic.putString("layout",label+" focus="+(focus==null?"none":focus.getClass().getSimpleName()+"/"+focus.getTag())+" scroll="+scroll.getScrollY()+" height="+scroll.getHeight()+" rows="+rows(a).size());sendStatus(0,diagnostic);});
         check(focused[0],label+" focused row is complete");check(actual[0]==expected[0],label+" complete-row capacity "+actual[0]+" == "+expected[0]);
@@ -31,8 +32,16 @@ public final class DisplayChecks extends Instrumentation {
         Context c=getTargetContext();SharedPreferences home=c.getSharedPreferences("home",0),history=c.getSharedPreferences("playback_history",0);
         home.edit().putBoolean("setup_seen",true).putString("groups","[{\"id\":\"all\",\"title\":\"Synthetic grid\",\"row\":false}]").putString("wallpaper_kind","builtin").commit();history.edit().putBoolean("enabled",false).commit();
         ActivityMonitor monitor=addMonitor(MainActivity.class.getName(),null,false);c.startActivity(new Intent().setComponent(new ComponentName(c,MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));activity=(MainActivity)waitForMonitorWithTimeout(monitor,10000);removeMonitor(monitor);if(activity==null)throw new AssertionError("No launcher");final MainActivity a=activity;frames(a);Thread.sleep(1200);frames(a);
-        // The production app scan is asynchronous. Do not replace its app list
-        // while a late initial scan can still commit over synthetic test data.
+        // Play Store package updates may arrive minutes after boot. This test
+        // owns an in-memory 42-app layout, not the real installed-app list.
+        // Isolate only this fixture from package discovery; production package
+        // observation remains enabled in every normal launcher and other suite.
+        main(()->{
+            if((Boolean)field(a,"packageReceiverRegistered")){a.unregisterReceiver((BroadcastReceiver)field(a,"packagesChanged"));set(a,"packageReceiverRegistered",false);}
+            ((Handler)field(a,"handler")).removeCallbacks((Runnable)field(a,"reloadApps"));
+            a.loadApps();
+        });
+        // Drain any scan already in flight before substituting synthetic data.
         long scanDeadline=SystemClock.uptimeMillis()+10000;boolean settled=false;
         while(SystemClock.uptimeMillis()<scanDeadline){final boolean[] ready={false};main(()->ready[0]=!(Boolean)field(a,"appsLoading")&&!(Boolean)field(a,"appsDirty"));if(ready[0]){settled=true;break;}frames(a);}
         if(!settled)throw new AssertionError("Initial app discovery did not finish");
