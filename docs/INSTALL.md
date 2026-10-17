@@ -72,12 +72,12 @@ Home 键过滤和默认 HOME 是两条独立路径。不要停用、卸载或替
 
 ```powershell
 adb connect TV_IP:5555
-adb -s TV_IP:5555 install -r QuietTV-v0.13.0.apk
+adb -s TV_IP:5555 install -r QuietTV-v0.14.0.apk
 # 打开界面（会切换电视画面）
 adb -s TV_IP:5555 shell am start -n local.quiettv.launcher/.MainActivity
 ```
 
-也可使用 `install-preview.ps1 -Device TV_IP:5555 -Apk .\QuietTV-v0.13.0.apk`。默认仅安装；加 `-Launch` 才打开画面。默认不修改安装验证设置。仅遇到已确认的固件安装验证兼容问题时，可显式加 `-UseAdbVerifierWorkaround`，它会暂时修改 ADB 验证开关并在 finally 中核对恢复。
+也可使用 `install-preview.ps1 -Device TV_IP:5555 -Apk .\QuietTV-v0.14.0.apk`。默认仅安装；加 `-Launch` 才打开画面。默认不修改安装验证设置。仅遇到已确认的固件安装验证兼容问题时，可显式加 `-UseAdbVerifierWorkaround`，它会暂时修改 ADB 验证开关并在 finally 中核对恢复。
 
 在支持以下命令的固件上可手动选择默认桌面：
 
