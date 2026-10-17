@@ -113,12 +113,13 @@ for phase in fresh upgrade; do
   grep -q "INSTRUMENTATION_RESULT: passed=$phase:" "$project_root/build/ci-artifacts/$phase.txt"
 done
 # Feature regressions use only synthetic apps, IDs, metadata and a locally encoded silent video.
-for scenario in rules display settings; do
+for scenario in rules display settings wallpaper; do
   if [[ "$scenario" == rules ]]; then adb_device shell pm revoke local.quiettv.launcher android.permission.READ_TV_LISTINGS; fi
   adb_device shell am force-stop local.quiettv.launcher
   runner=RuleChecks
   if [[ "$scenario" == display ]]; then runner=DisplayChecks; fi
   if [[ "$scenario" == settings ]]; then runner=SettingsChecks; fi
+  if [[ "$scenario" == wallpaper ]]; then runner=WallpaperChecks; fi
   # Six mixed-layout scenarios plus real software video decode can exceed four
   # minutes on API 30 hosted runners. Keep a finite scenario and job deadline.
   scenario_timeout=240

@@ -6,6 +6,7 @@
         <receiver android:name="local.quiettv.checks.TvProgramFixture" android:exported="true" android:permission="android.permission.DUMP" />
         <provider android:name="local.quiettv.launcher.CheckDocuments" android:authorities="local.quiettv.checks.documents" android:exported="true" />
         <activity android:name="local.quiettv.checks.RuleTargetActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LEANBACK_LAUNCHER" /></intent-filter></activity>
+        <activity android:name="local.quiettv.checks.WallpaperAwayActivity" android:exported="true" />
         <activity-alias android:name="local.quiettv.channel.ResumeAlias" android:targetActivity="local.quiettv.checks.RuleTargetActivity" android:exported="true" />
     </application>
     <instrumentation android:name="local.quiettv.launcher.DeviceChecks" android:targetPackage="local.quiettv.launcher" />
@@ -14,4 +15,5 @@
     <instrumentation android:name="local.quiettv.launcher.TvHistoryChecks" android:targetPackage="local.quiettv.launcher" />
     <instrumentation android:name="local.quiettv.launcher.WatchNextChecks" android:targetPackage="local.quiettv.launcher" />
     <instrumentation android:name="local.quiettv.launcher.SettingsChecks" android:targetPackage="local.quiettv.launcher" />
+    <instrumentation android:name="local.quiettv.launcher.WallpaperChecks" android:targetPackage="local.quiettv.launcher" />
 </manifest>

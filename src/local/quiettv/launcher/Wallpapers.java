@@ -84,7 +84,13 @@ final class Wallpapers {
     }
     private Bitmap decode(String key,BitmapFactory.Options o){o.inScaled=false;Bitmap bitmap=key.equals("builtin")?BitmapFactory.decodeResource(owner.getResources(),R.raw.nature_lake,o):BitmapFactory.decodeFile(key,o);if(bitmap==null||key.equals("builtin")||o.inJustDecodeBounds)return bitmap;try{android.media.ExifInterface exif=new android.media.ExifInterface(key);int orientation=exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION,1);Matrix m=new Matrix();switch(orientation){case 2:m.setScale(-1,1);break;case 3:m.setRotate(180);break;case 4:m.setScale(1,-1);break;case 5:m.setRotate(90);m.postScale(-1,1);break;case 6:m.setRotate(90);break;case 7:m.setRotate(270);m.postScale(-1,1);break;case 8:m.setRotate(270);break;default:return bitmap;}Bitmap oriented=Bitmap.createBitmap(bitmap,0,0,bitmap.getWidth(),bitmap.getHeight(),m,true);if(oriented!=bitmap)bitmap.recycle();return oriented;}catch(Exception ignored){return bitmap;}}
     private void showImage(){if(image!=null&&cached!=null){image.setImageBitmap(cached);if(active)animatePhoto();}}
-    void resume(){active=true;start();status();}
+    void resume(){
+        active=true;
+        // UI_HIDDEN can recycle the image while another app is in front. The
+        // desktop and its layer survive that trip, so attach() need not run.
+        if(image!=null&&cached==null&&!kind().equals("theme"))loadImage();
+        start();status();
+    }
     void pause(){active=false;release();status();}
     void dispose(){pause();disposed=true;worker.shutdownNow();}
     void trimMemory(int level){if(level<android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN)return;if(motion!=null){motion.cancel();motion=null;}if(image!=null)image.setImageBitmap(null);if(cached!=null&&!cached.isRecycled())cached.recycle();cached=null;cachedKey="";if(active&&!kind().equals("theme"))loadImage();}
