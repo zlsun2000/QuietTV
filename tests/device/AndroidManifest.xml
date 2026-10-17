@@ -13,4 +13,5 @@
     <instrumentation android:name="local.quiettv.launcher.RuleChecks" android:targetPackage="local.quiettv.launcher" />
     <instrumentation android:name="local.quiettv.launcher.TvHistoryChecks" android:targetPackage="local.quiettv.launcher" />
     <instrumentation android:name="local.quiettv.launcher.WatchNextChecks" android:targetPackage="local.quiettv.launcher" />
+    <instrumentation android:name="local.quiettv.launcher.SettingsChecks" android:targetPackage="local.quiettv.launcher" />
 </manifest>

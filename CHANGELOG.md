@@ -1,3 +1,10 @@
+# 0.14.0
+
+- 桌面设置改为“背景与外观、应用与分类、继续播放、天气、系统与桌面”五组。修改开关、主题和分类布局后保留当前页面与焦点，返回键逐级返回；授权和文件选择结束后可继续设置。更新主要设置项的中文与英文文案，并为长说明保留独立滚动区域。
+- “继续播放”首页收敛为显示开关、记录来源与权限、高级设置三个入口；应用适配规则与清空记录移入高级设置。保留原有功能选择，不因界面调整自动启用媒体访问或联网天气。
+- 汇总 0.13.1–0.14 候选版的输入源状态、媒体识别、背景导入与渲染、播放规则和可选 Watch Next 接入。Watch Next 需要系统提供者；联网海报仍仅限规则明确声明的 Watch Next 来源，没有恢复旧目录查询或广播网络封面。
+- 增加真实设置页面的遥控器回归，覆盖连续修改、逐级返回、焦点、取消删除以及英文大字体操作。各项发布验证与设备限制另见 Release 元数据。
+
 # 0.14.0-rc12
 
 - Add an opt-in, generic Watch Next adapter with app-scoped system-provider reads, stable hashed publisher identities, bounded/cancellable work and lifecycle ownership. App versions, signatures, source types and native entry contracts remain in independently imported JSON; no Netflix/TCL logic in the desktop. Handle both Android Intent URI serialization formats and re-read/revalidate the same content on click. Native progress remains controlled by the source app.

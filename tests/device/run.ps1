@@ -5,7 +5,7 @@ param(
     [string]$BuildTools='',
     [string]$Keystore='',
     [string]$Apk='',
-    [ValidateSet('display','rules','fresh','upgrade')][string]$Phase='display',
+    [ValidateSet('display','settings','rules','fresh','upgrade')][string]$Phase='display',
     [string]$Serial='emulator-5570',
     [int]$ServerPort=5041,
     [switch]$ReuseChecks
@@ -66,7 +66,7 @@ Guest install -r "$out\checks.apk"
 if($Phase -eq 'fresh'){Guest shell pm clear local.quiettv.launcher}
 if($Phase -eq 'rules'){Guest shell pm revoke local.quiettv.launcher android.permission.READ_TV_LISTINGS}
 Guest shell am force-stop local.quiettv.launcher
-$class=switch($Phase){'display'{'DisplayChecks'} 'rules'{'RuleChecks'} default{'DeviceChecks'}}
+$class=switch($Phase){'display'{'DisplayChecks'} 'settings'{'SettingsChecks'} 'rules'{'RuleChecks'} default{'DeviceChecks'}}
 $log=Guest shell am instrument -w -e phase $Phase "local.quiettv.checks/local.quiettv.launcher.$class"
 $log | Tee-Object -FilePath (Join-Path $project "emulator-local\$Serial\$Phase.txt")
 if(-not ($log -match 'INSTRUMENTATION_RESULT: passed=')){throw 'Emulator checks failed; inspect instrumentation output'}
