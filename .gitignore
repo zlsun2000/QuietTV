@@ -10,7 +10,8 @@
 !/PRIVACY.md
 !/SECURITY.md
 !/CONTRIBUTING.md
-!/AGENTS.md
+# Local AI instructions stay on the maintainer's computer.
+/AGENTS.md
 !/build.sh
 !/.github/
 !/AndroidManifest.xml
