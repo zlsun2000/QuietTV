@@ -2,6 +2,16 @@
 
 Scope: this repository. Read docs/BUILD.md, docs/ARCHITECTURE.md and docs/CUSTOMIZATION.md before changing the launcher. Keep changes focused and explain any unverified device behavior.
 
+## Writing for users: standing maintainer requirement
+
+The owner wants plain Chinese that people without a technical background can understand. This requirement persists across tasks, conversations, maintainers and releases. Read [docs/WRITING.md](docs/WRITING.md) before changing user-facing text or preparing a release.
+
+- README, GitHub release descriptions, public CHANGELOG, installation/help/privacy pages, UI text and replies to the owner must lead with what the user sees and what they need to do. Avoid unexplained acronyms, engineering jargon and literal translations of internal implementation terms.
+- Keep implementation details, commands, test counts and API/SDK names in clearly labelled developer documents or release metadata. User pages must still explain upgrade data loss, permissions, network/privacy effects and actual compatibility limits in everyday language.
+- Prepare release copy in docs/releases/vX.Y.Z.md using docs/releases/TEMPLATE.md, review it against docs/WRITING.md, then publish that exact text. Do not paste commit messages, CI output or technical audit reports into the public release body.
+- Preserve this requirement when updating project instructions. The PR checklist and release process must continue to reference it; a new feature is not a reason to revert to technical prose.
+- Documentation-only changes require link/anchor and formatting checks plus the public-file/history review. They do not require rebuilding the APK or operating a user's TV. Changes to packaged UI text/resources still require the appropriate build and checks.
+
 ## Structure and commands
 
 - Native Java (source compatibility Java 8), Android min API 23 / target API 28. No Gradle or external runtime dependencies.

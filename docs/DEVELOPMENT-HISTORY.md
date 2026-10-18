@@ -1,0 +1,185 @@
+# 开发与历史版本记录
+
+本页供维护者查阅，保留原有技术记录。候选版、测试版和早期个人版不等于公开发布，也不表示当前版本包含全部试验功能。普通用户看 [公开版更新记录](../CHANGELOG.md)，当前安装和安全建议以 [使用指南](INSTALL.md) 为准。
+
+# 0.14.1
+
+- 补充厂商安装来源、第三方桌面及 ADB 限制的排查说明，提供显式单次 ADB 兼容安装及原设置恢复方法；区分来源授权、Google 扫描、系统校验和签名冲突。
+- 修复部分电视解码器播放动态背景一轮后停止的问题：每轮结束后重建解码器，保留显示表面与上一帧；不再依赖固件的原生循环实现。
+- 修复 Android 6 等旧系统字体缩放后实际宽度仍超出容器的问题：时钟、日期和品牌文本按实际字形宽度复测，保留单行显示；增加不同时间字符串的回归。
+- 片尾监测根据实际播放及帧输出恢复停滞，并在完成回调丢失时重新播放；桌面暂停后停止监测，不截断正常播放。
+- 新增连续三轮帧输出、虚报循环状态、完成回调丢失、暂停与恢复的模拟器回归；状态诊断增加完成次数及数字错误码，不记录媒体路径或内容。
+
+# 0.14.0
+
+- 修复从视频应用返回后背景丢失、只显示主题配色的问题：后台内存回收后重新加载已选择的图片及视频静态回退，不重置背景配置。
+- 桌面设置改为“背景与外观、应用与分类、继续播放、天气、系统与桌面”五组。修改开关、主题和分类布局后保留当前页面与焦点，返回键逐级返回；授权和文件选择结束后可继续设置。更新主要设置项的中文与英文文案，并为长说明保留独立滚动区域。
+- “继续播放”首页收敛为显示开关、记录来源与权限、高级设置三个入口；应用适配规则与清空记录移入高级设置。保留原有功能选择，不因界面调整自动启用媒体访问或联网天气。
+- 汇总 0.13.1–0.14 候选版的输入源状态、媒体识别、背景导入与渲染、播放规则和可选 Watch Next 接入。Watch Next 需要系统提供者；联网海报仍仅限规则明确声明的 Watch Next 来源，没有恢复旧目录查询或广播网络封面。
+- 增加真实设置页面的遥控器回归，覆盖连续修改、逐级返回、焦点、取消删除以及英文大字体操作。各项发布验证与设备限制另见 Release 元数据。
+
+# 0.14.0-rc12
+
+- Add an opt-in, generic Watch Next adapter with app-scoped system-provider reads, stable hashed publisher identities, bounded/cancellable work and lifecycle ownership. App versions, signatures, source types and native entry contracts remain in independently imported JSON; no Netflix/TCL logic in the desktop. Handle both Android Intent URI serialization formats and re-read/revalidate the same content on click. Native progress remains controlled by the source app.
+- Hide empty MediaSession application placeholders when the same app has usable native content, retaining original history keys and progress. Add separately reviewed, optional publisher-supplied artwork: declared HTTPS hosts and image parameter names, pinned target identity, bounded local image cache, no catalog lookup or persisted URLs. Defaults and existing rules do not enable image networking.
+- Publish sanitized, manually enabled Netflix and TCL Bilibili JSON configurations with explicit validation limits. Add Watch Next schema/template, runtime permission flow, explicit DUMP rule-choice maintenance, redacted source/entry/artwork diagnostics, privacy/service review and isolated API 28/30 integration checks. Owner confirmed Netflix build 27207 can resume after clicking; this is not an all-device or exact-position claim. Local release candidate; no public Release.
+
+# 0.14.0-rc3
+
+- Add an explicit, DUMP-protected TV-history diagnostic to distinguish missing TV-listings permission from empty Watch Next/preview results. Reads require the existing history opt-ins plus a separately granted READ_TV_LISTINGS permission, use a fixed system authority and package filter, and report bounded counts and public provider declarations only. It does not collect content into history, launch playback or establish Netflix resume support.
+
+# 0.14.0-rc2
+
+- Add a DUMP-permission-protected ADB rule-only import. It validates the bounded JSON file through the normal registry, keeps imports disabled and reports a fixed result without opening UI or restoring history, backgrounds or other preferences. Netflix content-route inspection alone does not establish a usable media ID or exact resume support.
+
+# 0.14.0-rc1
+
+- Add local, modular playback rules: broadcast and MediaSession mappings, typed content/progress routes, app version/signature checks, opt-in JSON import, per-rule enable/disable, preflight diagnostics and one-version rollback. Move existing Bilibili/Qiyi routes into bundled JSON; retain legacy history identities, progress and choices. Include a schema, templates and an AI/community contribution guide. Rules cannot supply interfaces missing from the target app; current Bilibili 1.7.7 remains unverified.
+- Select vertical scroll positions that retain the focused row and maximize complete visible rows, including mixed favorites/history/grid layouts and repeated upward returns.
+- Preserve the root and video background layer across settings/history refreshes, avoiding decoder/Surface recreation and exposure of the builtin background. Lifecycle release and decoder failure fallback remain active.
+- Fit localized clock/date/brand text on one line and size toolbar labels around their icons; longer English labels and 12-hour periods no longer wrap or overlap.
+- Add isolated emulator regression tests for rule imports, routes, updates, rollback, history bounds, mixed-row navigation and real silent-video rendering. This is a local release candidate; OEM validation and public publication are separate steps.
+
+# 0.13.3-test
+
+- Stop presenting ambiguous Android hardware stream/hotplug states as a confirmed cable connection. Standard HDMI and AV ports without logical device evidence show an unconfirmed status and remain selectable; non-CEC devices are not assumed to be unplugged.
+- Use logical HDMI device states for running/standby display, retaining explicit parent disconnection and dedicated OEM insertion reports. Exclude disconnected or unknown logical devices from displayed names/counts. Input ordering, grouping and preferences remain unchanged.
+- Owner confirmed 0.13.2-test input order and console running/standby display, but empty HDMI/AV ports were falsely labeled connected. Bilibili history still failed and is deferred at the owner's request. This build's corrected status presentation remains pending device acceptance.
+
+# 0.13.2-test
+
+- Group standard Android TV HDMI inputs by their explicit parent relationship to avoid duplicate port/device cards. Preserve custom labels and preferences; multiple devices on one port retain a selection menu. Orphaned inputs keep their own routes.
+- Order HDMI cards numerically using original system labels while retaining manual order. Distinguish connected, standby, disconnected and unavailable states; unavailable labels/status no longer discard a usable input.
+- Show a per-app snapshot of public media sessions separately from history permission. This helps diagnose missing history without assuming support from an installed app or a device brand. Bilibili 1.7.7 history remains unverified.
+- Receive existing channel history broadcasts at runtime on Android 8+ while the launcher or OS-bound media listener is alive, retaining validated manifest delivery for explicit broadcasts. Per-app blocking now also applies to legacy Bilibili records. This fixes a delivery gap; it does not create an interface in apps that expose none.
+- Local test build; no broad OEM compatibility claim.
+
+# 0.13.1-test
+
+- Local TV test build for the P1/P2/P3 compatibility improvements: more reliable Home and media status, responsive input-source updates, safer background import/video fallback, clearer capability reporting, and improved locale, font-scale, RTL, and accessibility support. This build is not a public release and does not establish broad OEM compatibility.
+
+# 0.13.0
+
+- 发布签名密钥更换（此前的固定密钥不可用）：0.12.0 及更早版本不能覆盖升级到 0.13.0，需卸载重装，应用内配置、收藏与记录会丢失；0.13.0 起恢复固定签名，后续版本可覆盖升级。
+- 修复 Netflix 等不提供可用标题的 MediaSession 无法生成播放记录的问题：会话有播放状态但标题为空、仅为应用名或没有元数据时，用应用名（应用标签不可用时用包名）作记录标题；此类占位记录不虚构集数或精确续播，仍只显示“打开应用”，媒体 ID 能识别内容时才提示“恢复当前播放”。
+- 增加可选、默认关闭的 Home 键修复：无障碍服务过滤遥控器 Home 键并返回静幕，应对部分 Google TV 原厂桌面优先接管 Home 键。应用只引导到系统无障碍设置由用户启用服务，并核对实际启用状态；不停用也不卸载原厂桌面。未在 Google TV 实机验证。
+- 安装指南补充 Play Protect 拦截侧载安装的说明：说明这是对非 Play 商店来源 APK 的常见拦截，列出临时关闭扫描与授权“安装未知应用”两种通用做法；菜单名称因设备、系统版本和地区而异，未在各厂商固件逐一验证。
+
+# 0.12.0
+
+- 首个面向公开分享的版本，采用 MIT，提供安装/恢复、构建、兼容范围、隐私、贡献与 AI 定制指南。
+- 设置、默认桌面和其他 HOME 自动检测；首次使用帮助不依赖 ADB，保留原桌面与可撤销的默认选择。
+- 输入源按实际能力开放：保留 TCL 适配、增加标准 Android TV passthrough 入口，未知机型不沿用已验证雷鸟的端口列表；接口不可用时隐藏相关分组。
+- 支持系统文件选择器导入背景，复制到本应用目录，限制类型与大小；旧电视 U 盘浏览保留。
+- 全新安装默认关闭天气与播放记录；通过幂等迁移保留已有收藏、分类、背景、记录及功能开关。
+- 集中五个受边界保护的 UI 定制参数，保留原有默认布局；修复未测量窗口的零尺寸布局计算。
+- 清理构建输出、增加 Linux/macOS 构建和隔离 CI；公众脚本不预置个人电视地址，原 HOME 恢复需要明确组件。
+- 公开范围审查：排除音乐客户端补丁/专用接口、自动 IP 定位、目录自动查询和网络封面；补天气署名、许可入口与服务条件。
+- 构建、核心检查和模拟器结果见 Release 元数据，其他厂商实机兼容仍需反馈。
+
+以下 0.7–0.11 为个人定制历史，含不在公开版中的试验功能与旧测试结果，不代表公开版分发内容或兼容承诺。
+
+# 0.11
+
+- 接入标准 MediaSession 通用播放记录，通过可撤销的通知访问权限监听媒体会话；不读取通知正文或应用私有账号数据。
+- 保存应用提供的标题、副标题、封面与进度，跨应用隔离、区分剧集，处理晚到字段和停止报告进度；所有来源总上限仍为 8 项。
+- 只有同一内容仍在活动会话中时才显示“恢复当前播放”，否则标为“打开应用”；保留 B 站与 Apple Music 的专用续播行为。
+- 接入奇异果 TCL 版已有的历史广播，保留确切影片及集数 ID，固定并校验其内容入口，显示“打开内容”；尚未真实播放核对精确续播。
+- 增加通用识别及按应用开关，移除/清空后防止同一次播放被轮询重新加入；本地封面缓存有数量与尺寸上限，缺失时显示原应用图标。
+- 117 项核心检查及不输出音视频的实机合成回调检查通过，临时记录和测试应用已清理；备有保留原代码及签名的 0.10.3 回退包。
+
+# 0.10.3
+
+- 修复 B 站剧集广播省略 `episodeName` 时只能显示剧名的问题：按保存的视频与剧集编号查询公开资料，补齐集数、分 P 和相应封面；精确匹配 ID，不按序号猜测。
+- 后续稀疏广播保留已补齐字段，更新资料仅修改显示信息，不覆盖进度、时长、排序，不恢复已移除的记录。单 P 视频隐藏重复标题，留出进度空间。
+- 修复多张卡片或桌面重绘后共用封面下载却只刷新旧卡片的问题。限定公开 HTTPS 图片域名，使用 JPEG 缩略图、原子缓存写入、短暂失败重试，并保留缓存上限。
+- 实机补齐 6 条 B 站记录的资料；第 8/9 集和两个域名下的普通视频封面已截图核对。全部 7 条记录的进度、时长、排序保留，未开始新播放。
+- 65 项核心检查通过。已准备保留数据的 0.10.2 上一版回退包。
+
+# 0.10.2
+
+- 横向内容增加边缘方向箭头：只在对应方向有隐藏卡片时显示，抵达首尾自动消失，忽略空白内边距。
+- 分区、分类横排与独立记录横排共用裁切和方向提示，避免隐藏内容没有方向提示的问题。
+
+# 0.10.1
+
+- 天气缩为页首摘要，放到“静幕”右侧、时间上方；保留确认键打开预报。
+- 继续播放加入 Apple Music TV 最近一首歌曲、专辑封面、歌手和真实毫秒进度，音乐记录可独立关闭。
+- 配套音乐适配通过限定调用者包名、UID 和签名的本地接口读取最少元数据，沿用原应用的登录、队列及播放链路。冷启动显式触发其待恢复播放，离开页面取消待执行请求并保存进度。
+- 左侧常用应用、右侧继续播放共用垂直可见区域；两侧显式裁切横向视口，防止更多应用或第二条记录覆盖另一分区。
+- 元数据变化才重建桌面；只更新进度时直接刷新卡片，避免频繁重启背景。通过 44 项 JVM 核心检查，实机验证结果单独记录。
+
+# 0.9.1
+
+- 修复 B 站 TCL 路由忽略传入进度的问题，改用通用外部入口、秒进度和 `forcePlayProgress=1`。实机由用户确认从 10:07 续播成功。
+- 首屏改为常用应用与继续观看左右分区，并让标题与卡片整组显示。
+
+# 0.9
+
+- 顶部天气卡片、三日预报、IP 城市识别与手动校正；明确同意 IPWhois/Open-Meteo 后才联网，前台异步更新、离线保留缓存。
+- 接收 B 站 TCL 渠道版 `com.tv.history.add`，保存最近 8 个内容/剧集，卡片显示封面、进度，使用原有 TCL 外部入口传入视频编号和毫秒进度。
+- 保留完整行绘制、Direct Boot、背景循环、收藏和分类。新增组件可独立关闭，移除记录不删除 B 站内部历史。
+- 广播入参按不可信数据校验；内容跳转固定为 B 站组件，封面限制到其公开图片域名，下载有大小上限和失败退避。
+- 通过编译、APK 签名验证和 27 项 JVM 边界检查。准备保留数据的旧代码回退包；实机正常观看的广播接收与续播验证另记。
+
+# 0.8
+
+- 修复部分无音轨视频播放一次后停在最后一帧的问题；实机中系统播放器仍上报正在播放与循环开启，但位置和解码帧数不再变化。
+- 改为播放完成后重新创建视频播放器，并保留背景纹理的最后一帧；避开原生循环与片头跳转均未实际复位解码器的情况。补上系统未通知播放完成时的片尾回退。
+- 重播回调与定时检查只在桌面前台运行，离开桌面或更换背景即取消；忽略旧播放器回调。
+- 背景状态记录增加实际重播次数、片尾回退次数和 TextureView 帧更新数，便于确认持续播放。
+- 编译与签名校验通过，0.8 已安装，默认 HOME 与背景数据保留。用用户的 10 秒 H.264 无音轨视频确认跨过三次片尾，纹理帧更新累计达到 746；仅被动读取状态，未发送遥控按键或重启电视。0.7 源码与 APK 已备份。
+
+# 0.7
+
+- 修复下翻后相邻卡片行又露出一截的问题；0.6 仅加大行距，未覆盖滚动后的状态。
+- 只绘制在视口内完整可见的卡片行；未显示的行保留布局与焦点，向下导航仍能进入。
+- 焦点滚动将选中的整行移入视野，回到第一行时恢复顶部位置；限制内容绘制在滚动区域内。
+- 保留五列大卡片、Direct Boot、收藏、隐藏、排序、分类和背景。0.6 源码与 APK 已备份。
+- 安装与签名验证通过，恢复安装替换后被清除的默认 HOME 偏好。用户手动下翻后确认“我检查过了可以”；没有再发送测试遥控按键或重启。
+
+# 0.6
+
+- 根据用户授权的电视截图增加应用网格行距，避免默认首屏在底部露出第二行卡片的顶部细边。
+- 保留五列大卡片、原有排序与分类，以及 0.5 的 Direct Boot 修复。0.5 源码与 APK 已备份。
+- 用户授权的一次完整重启验证确认：系统第一个 HOME 直接启动静幕，早于用户数据解锁，用户也确认自动进入静幕。
+
+# 0.5
+
+- 应用卡片改为较大的五列布局；横排与网格采用相同的宽高公式，不再混用固定宽度和权重分配。
+- 缩放改用真实显示尺寸作为初值，并在返回桌面及实际根窗口尺寸变化后重新核对，恢复沉浸显示标志。
+- HOME Activity 支持 Direct Boot，可在冷启动早期作为默认桌面被系统解析。
+- 用户数据解锁前仅显示 APK 内置风景与准备提示；不读取收藏、分类、自定义媒体，不初始化输入源或视频播放器。
+- 收到用户解锁通知后加载原有数据；前台短暂轮询作为通知遗漏的回退，离开桌面即停止等待。
+- 原有配置与背景文件保留在原位置，未迁移数据，未增加权限、开机接收器、后台服务或厂商属性修改。
+- 0.4 APK、源码、资源与说明已备份。编译与签名核对后安装；遵照用户要求不重启、不做画面或遥控器测试，实际冷启动效果待用户验证。
+
+# 0.4
+
+- 参考 Emotn UI 的背景与简洁布局，新增原创静态矢量山景和轻量工具栏。
+- 大时钟、日期和当前选中项信息；缩小分类间距，首屏可完整显示全部应用第一排。
+- TV、HDMI、AV 使用不同图标与紧凑玻璃卡片，接入状态继续自动刷新。
+- 调整卡片圆角、边框、阴影、焦点动画和侧栏色彩。
+- 修复重绘过程中自动焦点覆盖选中卡片的问题，排序及返回桌面时保留目标焦点。
+- 按应用窗口尺寸统一缩放文字与图形，适配 1080p / 4K；未更改固件实际显示模式。
+- 保留旧版收藏、隐藏、分类和主题选择；0.3 源码和 APK 已备份。
+- 内置生成的自然山湖图片；支持图片缓慢移动、静音循环视频、U 盘/本地导入与已保存背景库。
+- 导入时按需请求媒体读取权限；离开桌面后停止动画并释放视频播放器。
+
+# 0.3
+
+- 原厂 TVActivity 接收 `targetSourceId`，TV、HDMI 1、HDMI 2、AV 卡片直接切换对应接口。
+- 根据 TCL 固件配置读取实际接口列表与插入状态，每 10 秒在前台刷新。
+- 使用已有 SPD / CEC 信息显示设备名；无数据时明确显示未知。
+- 输入源可收藏、排序、隐藏和添加到自定义分类。
+- 修复触控或空鼠操作进入排序后卡片丢失焦点的问题。
+
+# 0.2
+
+- 顶部改为紧凑的工具栏、日期与时钟。
+- 应用使用横向卡片，优先读取电视应用自带的 banner，名称放在卡片下方。
+- 独立常用分类，可新增与调整分类，并在横排和网格之间切换。
+- 长按应用显示右侧面板，可收藏、排序、隐藏、修改分类和查看应用信息。
+- 显式遥控器行间导航和自动滚动，卡片焦点放大与边框显示。
+- 深海蓝、暮色紫、石墨黑、森林绿四种本地背景。
+- 保留 0.1 收藏、隐藏设置及原厂桌面恢复入口。
