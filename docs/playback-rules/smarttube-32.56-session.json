@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": "quiettv.smarttube-stable",
+  "name": "SmartTube 32.56 · 视频进度续播",
+  "revision": 4,
+  "author": "QuietTV contributors",
+  "license": "MIT",
+  "description": "适用于 SmartTube 32.56，不适用于旧 SmartYouTube 6.17.739。接收应用提供的视频标识和进度，点击卡片后请求从相同秒数继续播放。此公开配置不下载封面。",
+  "verification": {
+    "status": "device",
+    "notes": "2026-10-19：本机雷鸟 50F295C-JN、Android 9、SmartTube 32.56。在个人测试版保存 142746 ms，关闭客户端后从桌面卡片重新打开，实际初始位置 142245 ms（约 2:22）并自动播放；用户也确认通过。公开配置保留相同续播参数，省略个人版联网封面。标题取决于应用提供的信息；需允许其发布播放通知。旧 SmartYouTube 及其他版本、设备未验证。"
+  },
+  "target": {
+    "package": "org.smarttube.stable",
+    "minVersionCode": 2446,
+    "maxVersionCode": 2446,
+    "certSha256": [
+      "109735aa24fe85e2e1623ebb3b1ecc4bf4263f4c6374e4411d646bfa2eda482a"
+    ]
+  },
+  "adapter": "media_session",
+  "fields": {
+    "id": {
+      "key": "mediaId",
+      "type": "id",
+      "required": true
+    },
+    "title": {
+      "key": "title",
+      "type": "text",
+      "required": true
+    },
+    "subtitle": {
+      "key": "subtitle",
+      "type": "text"
+    },
+    "position": {
+      "key": "position",
+      "type": "time",
+      "unit": "ms"
+    },
+    "duration": {
+      "key": "duration",
+      "type": "time",
+      "unit": "ms"
+    }
+  },
+  "identity": [
+    "id"
+  ],
+  "routes": [
+    {
+      "requires": [
+        "id",
+        "position"
+      ],
+      "capability": "position",
+      "intent": {
+        "action": "android.intent.action.VIEW",
+        "component": "com.liskovsoft.smartyoutubetv2.tv.ui.main.SplashActivity",
+        "data": {
+          "scheme": "https",
+          "host": "www.youtube.com",
+          "path": [
+            {
+              "type": "string",
+              "value": "watch"
+            }
+          ],
+          "query": {
+            "v": {
+              "type": "string",
+              "field": "id"
+            },
+            "t": {
+              "type": "long",
+              "field": "position",
+              "unit": "s"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

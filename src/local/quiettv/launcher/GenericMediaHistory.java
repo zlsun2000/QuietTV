@@ -47,6 +47,8 @@ final class GenericMediaHistory {
         r.videoId=MediaRecordPolicy.identity(pkg,m.getString(MediaMetadata.METADATA_KEY_MEDIA_ID),r.title,r.episode,r.album,r.duration);
         String rawId=MediaRecordPolicy.text(m.getString(MediaMetadata.METADATA_KEY_MEDIA_ID),1024);if(!rawId.isEmpty())r.contentId=MediaRecordPolicy.digest(rawId);
         PlaybackRules.decorateSession(c,r,m);
+        PlaybackRecord configured=null;for(PlaybackRecord old:new HistoryStore(c).list())if(MediaRecordPolicy.sameConfiguredSession(r,old)&&(configured==null||MediaRecordPolicy.metadataPlaceholder(configured)&&!MediaRecordPolicy.metadataPlaceholder(old)))configured=old;
+        if(configured!=null)MediaRecordPolicy.retainConfiguredSession(r,configured);
         for(PlaybackRecord old:new HistoryStore(c).list())if(MediaRecordPolicy.sameItem(r,old)){MediaRecordPolicy.retainIdentity(r,old);if(old.command.equals("media/qiyi")&&!r.episode.isEmpty()){r.command=old.command;r.routeId=old.routeId;r.episodeId=old.episodeId;r.routeChannel=old.routeChannel;}if(r.ruleId.isEmpty()&&!old.ruleId.isEmpty()){r.ruleId=old.ruleId;r.ruleData=new LinkedHashMap<>(old.ruleData);}break;}
         r.updated=System.currentTimeMillis();r.clamp();return r.valid()?r:null;
     }

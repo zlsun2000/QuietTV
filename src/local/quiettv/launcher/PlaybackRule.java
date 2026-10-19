@@ -74,7 +74,7 @@ final class PlaybackRule {
         if(!Arrays.asList("id","title","subtitle","position","duration").contains(name))require(!type.equals("text"),"路由字段需要有界标识");
     }
     private void validateRoute(JSONObject route)throws Exception {
-        keys(route,"when,requires,capability,intent");String capability=route.getString("capability");require(adapter.equals("watch_next")?capability.equals("native"):capability.equals("content")||capability.equals("position"),"入口能力不正确");
+        keys(route,"when,requires,capability,intent");String capability=route.getString("capability");require(adapter.equals("watch_next")?capability.equals("native"):Arrays.asList("content","position","native").contains(capability),"入口能力不正确");
         if(route.has("when")){JSONObject when=route.getJSONObject("when");require(when.length()<=4,"条件过多");Iterator<String> keys=when.keys();while(keys.hasNext()){String field=keys.next();require(ROUTE_FIELDS.contains(field)&&fields.has(field),"条件字段不正确");JSONArray values=when.getJSONArray(field);require(values.length()>0&&values.length()<=12,"条件值数量不正确");for(int i=0;i<values.length();i++)require(token(values.getString(i)),"条件值不正确");}}
         if(route.has("requires")){JSONArray required=route.getJSONArray("requires");require(required.length()<=6,"必需字段过多");for(int i=0;i<required.length();i++)require(ROUTE_FIELDS.contains(required.getString(i))&&fields.has(required.getString(i)),"必需字段未定义");}
         if(adapter.equals("watch_next")){require(!route.has("intent"),"系统入口由 Watch Next 声明限定，不能存入路由");return;}

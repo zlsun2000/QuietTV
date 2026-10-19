@@ -497,6 +497,11 @@
                 "capability": {
                   "const": "native"
                 }
+              },
+              "not": {
+                "required": [
+                  "intent"
+                ]
               }
             }
           },
@@ -721,10 +726,14 @@
                 "capability": {
                   "enum": [
                     "content",
-                    "position"
+                    "position",
+                    "native"
                   ]
                 }
-              }
+              },
+              "required": [
+                "intent"
+              ]
             }
           }
         }
@@ -1124,30 +1133,7 @@
             }
           ]
         }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "capability": {
-                "const": "native"
-              }
-            }
-          },
-          "then": {
-            "not": {
-              "required": [
-                "intent"
-              ]
-            }
-          },
-          "else": {
-            "required": [
-              "intent"
-            ]
-          }
-        }
-      ]
+      }
     }
   }
 }
