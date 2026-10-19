@@ -4,7 +4,7 @@
 
 0.14.0 起，已有渠道历史与续播参数改由本地 JSON 规则描述。规则可独立导入、启停、更新和回退，已有接入机制内的新适配无需重新编译 APK。支持范围取决于目标应用实际提供的接口；规则不能生成应用未公开的历史或续播能力。
 
-新增的[奇异果与 SmartTube 文件](playback-rules/README.md)及[开发过程与 AI 排查方法](QIYI-SMARTTUBE-DEVELOPMENT.md)记录了本机实际验证和失败原因。奇异果使用本次分支新增的普通 `native` 入口，0.14.1 及更早公开 APK 不能导入；SmartTube 使用已有 `position` 入口。不要把源码贡献当作已发布新 APK。
+新增的[奇异果与 SmartTube 文件](playback-rules/README.md)及[开发过程与 AI 排查方法](QIYI-SMARTTUBE-DEVELOPMENT.md)记录了本机实际验证和失败原因。奇异果使用 0.14.2 新增的普通 `native` 入口，0.14.1 及更早公开 APK 不能导入；SmartTube 使用已有 `position` 入口。两份配置需另行下载、导入并主动启用，不会因为更新桌面自动开启。
 
 ## 在电视上使用
 
@@ -52,7 +52,7 @@
 
 ## 续播入口
 
-`routes` 按顺序匹配，第一条满足 `when`（字段与枚举值）和 `requires`（已提供字段）的入口生效。普通规则的 `capability` 为 `content`（打开内容）、`position`（传递真实进度）或 `native`（由应用恢复自身历史，本次分支新增）。普通 `native` 与其他普通入口一样必须提供经过校验的 `intent`，显示“按应用进度续播”，不承诺指定旧集数或秒数；只有系统 Watch Next 的 `native` 省略 intent。建议有明确位置入口时再放一条只打开内容的回退规则。
+`routes` 按顺序匹配，第一条满足 `when`（字段与枚举值）和 `requires`（已提供字段）的入口生效。普通规则的 `capability` 为 `content`（打开内容）、`position`（传递真实进度）或 `native`（由应用恢复自身历史，0.14.2 新增）。普通 `native` 与其他普通入口一样必须提供经过校验的 `intent`，显示“按应用进度续播”，不承诺指定旧集数或秒数；只有系统 Watch Next 的 `native` 省略 intent。建议有明确位置入口时再放一条只打开内容的回退规则。
 
 `intent` 指定 action，可指定目标包内完整 `component`。渠道包名可与组件的 Java 命名空间不同，实际归属由固定 ComponentName 包名与系统解析结果校验。`extras` 的每项显式指定 `type`：`string`、`int`、`long`、`boolean`，并在 `field` 引用与常量 `value` 中二选一。`type: json` 把一层有类型的对象编码为字符串 extra，不支持继续嵌套。进度/时长的 `unit: s` 将规范化毫秒向下取整为秒，`optional: true` 可省略缺少的参数。
 
@@ -92,7 +92,7 @@ Netflix 使用独立 `watch_next` 规则，旧 MediaSession 候选保持停用�
 | --- | --- |
 | [Netflix Watch Next](playback-rules/netflix-watch-next.json) | Netflix 13.2.1/build 27207、目标签名限定；所有者在 Android 12 确认点击及封面。手动导入后主动开启，需节目表权限。含可选联网海报声明，先查看说明；其他版本/固件尚未验证。 |
 | [TCL 渠道 B 站](playback-rules/bilibili-tcl.json) | 与内置 rule_bili_tcl.json 同一 ID、revision 和内容，旧渠道环境曾成功；当前所有者 B 站 1.7.7 尚未成功。内置已存在时直接选择启用，同版本无需重复导入；贡献新规则须增加 revision 并实测。 |
-| [TCL 奇异果 16.9](playback-rules/qiyiguo-tcl-16.9.json) | 按原应用历史恢复进度；本机个人版确认含广告流程返回后仍更新记录。需要本次新增的普通 native 支持；0.14.1 不能导入。旧集数可能按应用当前历史选择，不承诺指定集数。 |
+| [TCL 奇异果 16.9](playback-rules/qiyiguo-tcl-16.9.json) | 按原应用历史恢复进度；本机个人版确认含广告流程返回后仍更新记录。需要 0.14.2；0.14.1 不能导入。旧集数可能按应用当前历史选择，不承诺指定集数。 |
 | [SmartTube 32.56](playback-rules/smarttube-32.56-session.json) | 本机个人版确认关闭客户端后从约 2:22 自动续播；不适用于旧 SmartYouTube。包名、版本、签名限定，不下载封面；公开 APK 尚未在该机重验。 |
 
 这些规则按应用包、字段及入口契约工作，名称中的渠道不能替代接口验证。系统或目标应用没有发布记录时，导入配置也不能生成历史。Netflix 下载配置使用 quiettv.netflix-watch-next ID；本地早期试验规则存在时应先停用重叠规则，不会同时启用两套来源。公开配置不包含真实片名、用户身份、账号或完整链接。

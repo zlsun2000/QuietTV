@@ -28,7 +28,7 @@
 
 安装时不需要电脑调试，也不需要删除原来的桌面。如果电视允许更换默认桌面，可以把静幕设为默认；部分电视会限制这一操作或在重启后返回原桌面。有些电视会阻止安装从商店以外下载的应用，遇到提示时请看[安装帮助](docs/INSTALL.md#安装失败先区分原因)。
 
-**已装旧版？** 0.13.0、0.14.0 用户可直接安装 0.14.1，保留原设置。0.12.0 及更早版本不能直接升级；卸载会删除配置和记录，请先看[升级说明](docs/INSTALL.md#升级)。
+**已装旧版？** 0.13.0 至 0.14.1 的官方版本可直接安装 0.14.2，保留原设置。0.12.0 及更早版本不能直接升级；卸载会删除配置和记录，请先看[升级说明](docs/INSTALL.md#升级)。
 
 想换回原桌面，可以在电视的默认桌面设置中重新选择它。详细步骤见[安装与恢复指南](docs/INSTALL.md)。
 
@@ -53,4 +53,4 @@
 
 可选适配文件：[Netflix](docs/playback-rules/netflix-watch-next.json)、[TCL 渠道 B 站](docs/playback-rules/bilibili-tcl.json)。请先看[使用条件](docs/PLAYBACK-RULES.md#在电视上使用)：Netflix 仅在特定版本和设备验证过，当前 B 站 1.7.7 尚未成功适配。导入后需要手动启用，不能保证所有版本都可用。
 
-新贡献的[奇异果、SmartTube 续播配置及使用说明](docs/playback-rules/README.md)记录了特定版本的实测结果。**奇异果文件需要后续支持它的新安装包，当前 0.14.1 不能导入。** 想让 AI 帮自己寻找常用应用的接口，可以参考[这次的开发过程](docs/QIYI-SMARTTUBE-DEVELOPMENT.md)，包括走不通的方法和验收步骤。
+0.14.2 新增[奇异果、SmartTube 续播配置及使用说明](docs/playback-rules/README.md)。两份 JSON 可从[发布页](https://github.com/zlsun2000/QuietTV/releases/tag/v0.14.2)另行下载，安装桌面后仍需导入并启用；只适用于说明中的应用版本。想让 AI 帮自己寻找常用应用的接口，可以参考[这次的开发过程](docs/QIYI-SMARTTUBE-DEVELOPMENT.md)，包括走不通的方法和验收步骤。
