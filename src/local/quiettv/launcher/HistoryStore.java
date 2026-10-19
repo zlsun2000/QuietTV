@@ -31,8 +31,8 @@ final class HistoryStore {
         return list;
     }
     ArrayList<PlaybackRecord> visible(){ArrayList<PlaybackRecord> result=new ArrayList<>();if(enabled())for(PlaybackRecord r:list())if(appEnabled(r.source)&&(!r.apple()||musicEnabled())&&(!r.generic()||(r.configured()&&!r.watchNext())||genericEnabled())&&sourceAvailable(r))result.add(r);
-        HashSet<String> nativeApps=new HashSet<>();for(PlaybackRecord r:result)if(r.watchNext()&&WatchNextHistory.eligible(context,PlaybackRules.get(context).find(r.ruleId)))nativeApps.add(r.source);
-        for(int i=result.size()-1;i>=0;i--)if(result.get(i).appPlaceholder()&&nativeApps.contains(result.get(i).source))result.remove(i);return result;}
+        ArrayList<PlaybackRecord> resumable=new ArrayList<>();PlaybackRules registry=PlaybackRules.get(context);for(PlaybackRecord r:result)if(registry.resumable(r))resumable.add(r);
+        for(int i=result.size()-1;i>=0;i--)for(PlaybackRecord specific:resumable)if(MediaRecordPolicy.redundantSession(result.get(i),specific)){result.remove(i);break;}return result;}
     private boolean sourceAvailable(PlaybackRecord record){try{return context.getPackageManager().getApplicationInfo(record.source,0).enabled;}catch(Exception ignored){return false;}}
     boolean put(PlaybackRecord record){
         if(!enabled()||!record.valid()||!appEnabled(record.source)||(record.generic()&&(!record.configured()||record.watchNext())&&!genericEnabled()))return false;record.clamp();

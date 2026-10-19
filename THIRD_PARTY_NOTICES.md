@@ -13,7 +13,7 @@ APK 的 `res/raw/legal_notices.txt` 同时包含完整 MIT 版权/许可证及�
 | 运行时应用图标、媒体标题/封面 | 用户已安装应用通过 Android API 提供 | 不打包为 APK/源码资源；仅本地显示、有限缓存，不纳入 MIT。文档截图中的图标按下一项处理 |
 | `docs/images/quiettv-home.png` | 公开版在隔离 Android TV 环境中的真实截图，来源见 [截图说明](docs/SCREENSHOTS.md) | 桌面与内置背景属于项目可许可内容；画面中的系统应用图标/名称属于各自权利人，不纳入 MIT，不表示合作或背书。无私人记录、账号或用户导入素材 |
 | FLauncher / Emotn UI | 交互/视觉参考 | 未纳入其源码、资源、截图或商标；这些项目不为静幕背书 |
-| B 站、奇异果、TCL、Netflix、Disney、Apple Music | 说明兼容性所用第三方名称或包标识 | 权利属于各自权利人，无官方合作或授权暗示。不发布其应用、账号工具、音乐/视频或 DRM 实现 |
+| B 站、奇异果、TCL、Netflix、Disney、Apple Music、SmartTube、SmartYouTube、YouTube | 说明兼容性所用第三方名称或包标识 | 权利属于各自权利人，无官方合作或授权暗示。不发布其应用、账号工具、音乐/视频或 DRM 实现；SmartTube 的续播配置独立编写，不包含其源码或 APK |
 
 源码 MIT 允许商业使用；这不改变外部 API 的访问条件。商业分支应关闭默认免费天气或配置合法服务方案，不能把服务密钥打包进公开 APK。网络数据、用户导入背景和第三方媒体不受本仓库 MIT 覆盖。
 

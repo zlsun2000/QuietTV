@@ -139,8 +139,13 @@ final class PlaybackRules {
         if(target.activityInfo.permission!=null&&context.checkSelfPermission(target.activityInfo.permission)!=PackageManager.PERMISSION_GRANTED){note(rule,"目标续播入口需要未授予的权限");return null;}
         return intent;
     }
+    boolean resumable(PlaybackRecord record){
+        PlaybackRule rule=usable(record);if(rule==null)return false;
+        if(record.watchNext())return WatchNextHistory.eligible(context,rule);
+        try{JSONObject spec=rule.route(data(record));return spec!=null&&!spec.getString("capability").equals("content")&&route(rule,record)!=null;}catch(Exception ignored){return false;}
+    }
     String action(PlaybackRecord record){
-        PlaybackRule rule=usable(record);if(rule!=null&&record.watchNext())return WatchNextHistory.eligible(context,rule)?"尝试继续观看":"打开应用";if(rule!=null)try{JSONObject route=rule.route(data(record));if(route!=null&&route(rule,record)!=null)return route.getString("capability").equals("position")?"尝试继续播放":"打开内容";}catch(Exception ignored){note(rule,"记录与当前规则不匹配");}
+        PlaybackRule rule=usable(record);if(rule!=null&&record.watchNext())return WatchNextHistory.eligible(context,rule)?"尝试继续观看":"打开应用";if(rule!=null)try{JSONObject route=rule.route(data(record));if(route!=null&&route(rule,record)!=null)return route.getString("capability").equals("native")?"按应用进度续播":route.getString("capability").equals("position")?"尝试继续播放":"打开内容";}catch(Exception ignored){note(rule,"记录与当前规则不匹配");}
         return "打开应用";
     }
     boolean openRoute(PlaybackRecord record){

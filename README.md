@@ -52,3 +52,5 @@
 源码采用 [MIT 许可](LICENSE)。[隐私说明](PRIVACY.md)、[素材与服务来源](THIRD_PARTY_NOTICES.md)、[发布前审查](docs/LEGAL-REVIEW.md)和[截图来源](docs/SCREENSHOTS.md)供需要了解细节的人查阅。
 
 可选适配文件：[Netflix](docs/playback-rules/netflix-watch-next.json)、[TCL 渠道 B 站](docs/playback-rules/bilibili-tcl.json)。请先看[使用条件](docs/PLAYBACK-RULES.md#在电视上使用)：Netflix 仅在特定版本和设备验证过，当前 B 站 1.7.7 尚未成功适配。导入后需要手动启用，不能保证所有版本都可用。
+
+新贡献的[奇异果、SmartTube 续播配置及使用说明](docs/playback-rules/README.md)记录了特定版本的实测结果。**奇异果文件需要后续支持它的新安装包，当前 0.14.1 不能导入。** 想让 AI 帮自己寻找常用应用的接口，可以参考[这次的开发过程](docs/QIYI-SMARTTUBE-DEVELOPMENT.md)，包括走不通的方法和验收步骤。

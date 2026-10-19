@@ -1,0 +1,124 @@
+{
+  "schema": 1,
+  "id": "quiettv.qiyi-tcl",
+  "name": "奇异果 16.9 · 按应用进度续播",
+  "revision": 7,
+  "author": "QuietTV contributors",
+  "license": "MIT",
+  "description": "点击桌面记录，由爱奇艺自己的播放历史恢复进度。已在本机验证含广告内容返回后仍更新记录；不强制指定毫秒位置。此公开配置不下载封面。",
+  "verification": {
+    "status": "device",
+    "notes": "2026-10-19：本机雷鸟 50F295C-JN、Android 9、应用 16.9.0.221250。在个人测试版实测：含广告剧集约 13 秒续播，返回收到 72 秒新记录；从桌面再次打开约 1:12 续播，进入下一集后收到第 2 集 10 秒记录。由爱奇艺恢复自己的历史，不承诺指定旧集数或毫秒位置。公开配置保留相同续播参数，省略个人版联网封面；其他设备和版本未验证。"
+  },
+  "target": {
+    "package": "com.tcl.qiyiguo",
+    "minVersionCode": 221250,
+    "maxVersionCode": 221250,
+    "certSha256": [
+      "bf46eae985c1ab0d636833670c3686bc443e49f37d75dec5909adcb587a80ab4"
+    ]
+  },
+  "adapter": "broadcast",
+  "event": {
+    "add": "com.tv.history.add",
+    "delete": "com.tv.history.del.tolauncher",
+    "sourceFields": [
+      "packageName"
+    ],
+    "sourceValues": [
+      "com.tcl.qiyiguo"
+    ]
+  },
+  "fields": {
+    "id": {
+      "key": "videoId",
+      "equalsKey": "cmdInfo",
+      "equalsJsonKey": "videoId",
+      "type": "numeric",
+      "required": true
+    },
+    "episodeId": {
+      "key": "cmdInfo",
+      "jsonKey": "episodeId",
+      "type": "numeric",
+      "required": true
+    },
+    "title": {
+      "key": "videoName",
+      "type": "text",
+      "required": true
+    },
+    "subtitle": {
+      "key": "episodeName",
+      "type": "text"
+    },
+    "position": {
+      "key": "currentPosition",
+      "type": "time",
+      "unit": "ms"
+    },
+    "duration": {
+      "key": "duration",
+      "type": "time",
+      "unit": "s"
+    },
+    "channel": {
+      "key": "cmdInfo",
+      "jsonKey": "chnId",
+      "type": "id",
+      "default": "0"
+    }
+  },
+  "identity": [
+    "id",
+    "episodeId"
+  ],
+  "routes": [
+    {
+      "requires": [
+        "id",
+        "episodeId",
+        "channel"
+      ],
+      "capability": "native",
+      "intent": {
+        "action": "com.tcl.qiyiguo.action.ACTION_PLAYVIDEO",
+        "extras": {
+          "playInfo": {
+            "type": "json",
+            "value": {
+              "playType": {
+                "type": "string",
+                "value": "history"
+              },
+              "videoId": {
+                "type": "string",
+                "field": "id"
+              },
+              "episodeId": {
+                "type": "string",
+                "field": "episodeId"
+              },
+              "history": {
+                "type": "int",
+                "value": -1
+              },
+              "customer": {
+                "type": "string",
+                "value": "tcl"
+              },
+              "chnId": {
+                "type": "int",
+                "field": "channel"
+              },
+              "autocomplete": {
+                "type": "boolean",
+                "value": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
