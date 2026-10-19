@@ -11,14 +11,16 @@ import java.util.concurrent.*;
 
 /** Regression scenarios on a disposable emulator only; no accounts, apps or user media. */
 public final class DisplayChecks extends Instrumentation {
+    private boolean focusRefreshOnly;
     private int count;private final ArrayList<String> failures=new ArrayList<>();
-    @Override public void onCreate(Bundle args){super.onCreate(args);start();}
+    @Override public void onCreate(Bundle args){super.onCreate(args);focusRefreshOnly=args!=null&&"true".equals(args.getString("focusRefreshOnly"));start();}
     interface Work {void run()throws Exception;}
     private void main(Work work){final Throwable[] failure={null};runOnMainSync(()->{try{work.run();}catch(Throwable e){failure[0]=e;}});if(failure[0]!=null)throw new RuntimeException(failure[0]);}
     private Object field(Object owner,String name)throws Exception {Field f=owner.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(owner);}
     private void set(Object owner,String name,Object value)throws Exception {Field f=owner.getClass().getDeclaredField(name);f.setAccessible(true);f.set(owner,value);}
     private void check(boolean ok,String text){count++;Bundle progress=new Bundle();progress.putString("check",(ok?"PASS ":"FAIL ")+text);sendStatus(0,progress);if(!ok)failures.add(text);}
     private void frames(Activity activity)throws Exception {CountDownLatch latch=new CountDownLatch(1);main(()->activity.getWindow().getDecorView().postOnAnimation(()->activity.getWindow().getDecorView().postOnAnimation(latch::countDown)));if(!latch.await(10,TimeUnit.SECONDS))throw new AssertionError("No frames");Thread.sleep(220);}
+    private void holdLayout(MainActivity a,boolean hold)throws Exception {if(Build.VERSION.SDK_INT>=29)main(()->ViewGroup.class.getMethod("suppressLayout",boolean.class).invoke(field(a,"root"),hold));}
     @SuppressWarnings("unchecked") private ArrayList<MainActivity.CardRow> rows(MainActivity a)throws Exception {return (ArrayList<MainActivity.CardRow>)field(a,"cardRows");}
     private int visible(MainActivity activity)throws Exception {int n=0;HashSet<android.graphics.Rect> bands=new HashSet<>();for(MainActivity.CardRow row:rows(activity))if(row.fullyVisible()&&bands.add(row.cardBounds()))n++;return n;}
     private void capacity(MainActivity a,String label)throws Exception {
@@ -45,7 +47,7 @@ public final class DisplayChecks extends Instrumentation {
         long scanDeadline=SystemClock.uptimeMillis()+10000;boolean settled=false;
         while(SystemClock.uptimeMillis()<scanDeadline){final boolean[] ready={false};main(()->ready[0]=!(Boolean)field(a,"appsLoading")&&!(Boolean)field(a,"appsDirty"));if(ready[0]){settled=true;break;}frames(a);}
         if(!settled)throw new AssertionError("Initial app discovery did not finish");
-        for(int scenario:new int[]{5,6,15,16,25,26}){final int columns=scenario%10;
+        for(int scenario:focusRefreshOnly?new int[]{5}:new int[]{5,6,15,16,25,26}){final int columns=scenario%10;
             main(()->{
                 Dialog sheet=(Dialog)field(a,"sheet");if(sheet!=null)sheet.dismiss();ArrayList list=(ArrayList)field(a,"apps");Object template=list.get(0);Class<?> type=template.getClass();Constructor<?> constructor=type.getDeclaredConstructor();constructor.setAccessible(true);list.clear();
                 for(int i=0;i<42;i++){Object item=constructor.newInstance();for(String name:new String[]{"intent","icon","banner","color"})set(item,name,field(template,name));set(item,"pkg","local.quiettv.synthetic.app"+i);set(item,"name",String.format(Locale.US,"App %02d",i));list.add(item);}
@@ -53,6 +55,14 @@ public final class DisplayChecks extends Instrumentation {
                 Properties properties=new Properties();properties.setProperty("grid.columns",String.valueOf(columns));set(a,"ui",new UiConfig(properties));a.loadGroups();a.render();
             });frames(a);
             final int[] initial={0};main(()->initial[0]=visible(a));check(initial[0]>=1,"scenario "+scenario+" starts with complete rows");
+            // Delayed package events rebuild the desktop while a remote target is
+            // below the initial viewport. Restore visibility after actual layout.
+            final Object[] selected={null};main(()->{ArrayList<ArrayList<View>> graph=(ArrayList<ArrayList<View>>)field(a,"focusRows");ArrayList<View> last=graph.get(graph.size()-1);View v=last.get(last.size()-1);v.requestFocus();selected[0]=v.getTag();});frames(a);
+            holdLayout(a,true);try{main(a::render);frames(a);}finally{holdLayout(a,false);}frames(a);final boolean[] restored={false};main(()->{View v=a.getCurrentFocus();android.graphics.Rect rect=new android.graphics.Rect();restored[0]=v!=null&&selected[0].equals(v.getTag())&&v.getGlobalVisibleRect(rect)&&rect.width()>0&&rect.height()>0&&v.getParent() instanceof MainActivity.CardRow&&((MainActivity.CardRow)v.getParent()).fullyVisible();});
+            check(restored[0],"scenario "+scenario+" refresh restores the selected offscreen card only after layout");
+            final Object[] moved={null};holdLayout(a,true);try{main(()->{a.render();a.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_UP));moved[0]=a.getCurrentFocus().getTag();});frames(a);}finally{holdLayout(a,false);}frames(a);main(()->{View v=a.getCurrentFocus();restored[0]=v!=null&&moved[0].equals(v.getTag())&&v.getParent() instanceof MainActivity.CardRow&&((MainActivity.CardRow)v.getParent()).fullyVisible();});
+            check(restored[0],"scenario "+scenario+" keys during refresh keep the newer target visible without stale focus callbacks");
+            if(focusRefreshOnly)continue;
             // Follow real DPAD focus transitions through enough rows to move the viewport,
             // then return to a middle row that should recover the initial visible capacity.
             main(()->rows(a).get(0).getChildAt(0).requestFocus());frames(a);
@@ -66,6 +76,7 @@ public final class DisplayChecks extends Instrumentation {
             for(int step=0;step<5;step++){sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);frames(a);capacity(a,"scenario "+scenario+" down "+step);}
             for(int step=0;step<4;step++){sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP);frames(a);capacity(a,"scenario "+scenario+" up "+step);}
         }
+        if(focusRefreshOnly){result.putString(failures.isEmpty()?"passed":"failed",count+" focus refresh checks; failures="+failures.toString());finish(failures.isEmpty()?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);return;}
         Wallpapers wallpaper=(Wallpapers)field(a,"wallpapers");File video=SyntheticVideo.create(new File(c.getCacheDir(),"synthetic-wallpaper.mp4"));CountDownLatch imported=new CountDownLatch(1);final boolean[] ok={false};wallpaper.importFile(video,(success,isVideo)->{ok[0]=success&&isVideo;imported.countDown();});check(imported.await(10,TimeUnit.SECONDS)&&ok[0],"synthetic silent video imports");main(a::render);
         long deadline=SystemClock.uptimeMillis()+10000;while(SystemClock.uptimeMillis()<deadline){frames(a);final boolean[] ready={false};main(()->ready[0]=wallpaper.videoCapability().isAvailable());if(ready[0])break;}
         final Object[] original=new Object[4];final long[] before={0};main(()->{original[0]=field(wallpaper,"layer");original[1]=field(wallpaper,"texture");original[2]=field(wallpaper,"surface");original[3]=field(wallpaper,"player");before[0]=(Long)field(wallpaper,"videoFrames");});check(original[3]!=null&&before[0]>0,"video decoder produces actual frames");

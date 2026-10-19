@@ -355,7 +355,24 @@ public class MainActivity extends Activity {
     }
     View tool(String label,String tag,int glyph,final Runnable action){final Tool t=new Tool(this,label,glyph);t.setTag(tag);t.setId(View.generateViewId());Paint measure=new Paint();measure.setTextSize(sp(11));measure.setTypeface(Typeface.create("sans-serif-medium",0));int width=Math.max(dp(92),Math.min(dp(190),(int)Math.ceil(measure.measureText(label))+dp(52)));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(width,dp(36));lp.leftMargin=dp(10);t.setLayoutParams(lp);t.setOnClickListener(new View.OnClickListener(){public void onClick(View v){action.run();}});return t;}
     void focusChanged(final View v,boolean focused){
-        v.animate().scaleX(focused?1.045f:1).scaleY(focused?1.045f:1).setDuration(180).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();v.setTranslationZ(focused?dp(8):0);v.invalidate();if(focused){selected=(String)v.getTag();updateSelection(v);if(hint!=null)hint.setText(!moving.isEmpty()?"方向键移动卡片    确认键或返回键完成排序":manage?"确认键隐藏 / 显示应用    返回键完成整理":"方向键选择    确认键打开    长按确认键整理");v.post(new Runnable(){public void run(){if(v.isFocused()&&scroll!=null){if(v.getParent() instanceof CardRow)scroll.revealTile(v);else scroll.scrollTo(0,0);Rect r=new Rect(-dp(8),-dp(8),v.getWidth()+dp(8),v.getHeight()+dp(8));v.requestRectangleOnScreen(r,false);if(v.getParent() instanceof CardRow&&((View)v.getParent()).getParent() instanceof RecentStrip)((RecentStrip)((View)v.getParent()).getParent()).scrollTo(Math.max(0,v.getLeft()-dp(12)),0);}}});}
+        v.animate().scaleX(focused?1.045f:1).scaleY(focused?1.045f:1).setDuration(180).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();v.setTranslationZ(focused?dp(8):0);v.invalidate();if(focused){selected=(String)v.getTag();updateSelection(v);if(hint!=null)hint.setText(!moving.isEmpty()?"方向键移动卡片    确认键或返回键完成排序":manage?"确认键隐藏 / 显示应用    返回键完成整理":"方向键选择    确认键打开    长按确认键整理");v.post(()->revealFocusedView(v));}
+    }
+    private boolean focusGeometryReady(View v){return scroll!=null&&v.getWidth()>0&&v.getHeight()>0&&scroll.getHeight()>0&&!v.isLayoutRequested()&&!scroll.isLayoutRequested();}
+    private void revealFocusedView(final View v){
+        if(!v.isFocused()||!v.isAttachedToWindow()||scroll==null)return;
+        if(!focusGeometryReady(v)){
+            final View page=desktopPage;final ViewTreeObserver observer=v.getViewTreeObserver();
+            observer.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener(){public void onGlobalLayout(){
+                boolean current=page==desktopPage&&v.isAttachedToWindow()&&v.isFocused();
+                if(!current||focusGeometryReady(v)){
+                    if(observer.isAlive())observer.removeOnGlobalLayoutListener(this);
+                    if(current)revealFocusedView(v);
+                }
+            }});return;
+        }
+        if(v.getParent() instanceof CardRow)scroll.revealTile(v);else scroll.scrollTo(0,0);
+        Rect r=new Rect(-dp(8),-dp(8),v.getWidth()+dp(8),v.getHeight()+dp(8));v.requestRectangleOnScreen(r,false);
+        if(v.getParent() instanceof CardRow&&((View)v.getParent()).getParent() instanceof RecentStrip)((RecentStrip)((View)v.getParent()).getParent()).scrollTo(Math.max(0,v.getLeft()-dp(12)),0);
     }
     // Keep partially visible rows in the focus graph, but paint only complete cards.
     // This rule applies to every scroll position, including repeated up/down moves.
