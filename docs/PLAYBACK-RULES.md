@@ -64,6 +64,8 @@ Netflix 使用独立 `watch_next` 规则，旧 MediaSession 候选保持停用�
 
 ## 用 AI 制作与贡献
 
+可直接复制仓库根目录的 **[RULE-PROMPT.md](../RULE-PROMPT.md)**（中英文），包含输入信息、接口证据、JSON 生成边界、合成样例和验证结果格式。社区贡献放在 [playback-rules/community/](../playback-rules/community/README.md)，也可以只[提交设备验证结果](https://github.com/zlsun2000/QuietTV/issues/new?template=device_verification.yml)。没有足够接口证据时，交付未知项，不生成带占位符的“可用”规则。
+
 将本页、Schema、一个模板，以及合法获得的接口说明和**合成/脱敏样例**提供给 AI。可使用以下任务：
 
 > 按 QuietTV 规则规范 v1，为目标应用生成单个 JSON 配置。包名、versionCode 范围、来源字段、标识、时间单位和续播入口以我提供的接口资料为准。未知字段保留待确认，不推测协议、不读取账号库、不添加播放 URL、凭据或远程封面。标为 unverified，给出合成事件及预期内容/进度参数，列出尚需确认的能力。

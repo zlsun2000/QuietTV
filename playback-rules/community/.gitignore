@@ -1,0 +1,10 @@
+# Only reviewed rule text, evidence notes, and synthetic samples belong here.
+/*
+!/.gitignore
+!/README.md
+!/TEMPLATE.md
+!/*/
+/*/*
+!/*/rule.json
+!/*/README.md
+!/*/samples.json

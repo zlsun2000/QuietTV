@@ -3,6 +3,11 @@
 !/.gitignore
 !/.gitattributes
 !/README.md
+!/README.en.md
+!/RULE-PROMPT.md
+!/playback-rules/
+/playback-rules/*
+!/playback-rules/community/
 !/CHANGELOG.md
 !/BACKGROUND-ASSETS.md
 !/LICENSE

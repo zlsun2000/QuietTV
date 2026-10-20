@@ -20,6 +20,8 @@
 
 继续播放适配可以贡献独立 JSON 规则，参见[规范、模板与 AI 制作流程](docs/PLAYBACK-RULES.md)。提供合成样例、接口来源、应用版本及实测能力；没有真实接口或未实测的配置标为待验证。
 
+想从 AI 开始，可复制 [RULE-PROMPT.md](RULE-PROMPT.md)；新社区规则按 [community 目录说明](playback-rules/community/README.md)及[贡献模板](playback-rules/community/TEMPLATE.md)组织。不会提交代码也可以[提交你的设备验证结果](https://github.com/zlsun2000/QuietTV/issues/new?template=device_verification.yml)。目录收录不代表全设备实测，也不会自动下载到用户电视。
+
 [奇异果与 SmartTube 的开发过程](docs/QIYI-SMARTTUBE-DEVELOPMENT.md)记录了如何确认广播字段、核对时间单位、寻找固定播放入口，以及怎样发现“能进去但退出后不再记录”的问题。可以把它交给 AI 作为调查方法，不能照抄广播名来假设另一应用也支持。
 
 代码贡献者先阅读 [构建说明](docs/BUILD.md) 和 [架构](docs/ARCHITECTURE.md)。Fork 后新建分支；聚焦一个问题。保留 MIT 和素材来源，AI 生成的改动也需要人工检查与构建验证。代码修改提交前运行干净构建和核心检查；设备改动再按 docs/COMPATIBILITY.md 验收实际能力。只改文档时检查链接、文字和公开文件范围即可，不必重新构建安装包或操作电视。

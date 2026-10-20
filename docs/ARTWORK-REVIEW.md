@@ -4,7 +4,7 @@
 
 Android 的[公开 Watch Next 契约](https://developer.android.com/training/tv/discovery/watch-next-add-programs)明确提供 posterArtUri，供桌面展示发布的节目。经所有者授权，在系统提供者确认 Netflix build 27207 发布的 poster_art_uri 使用 Netflix 的 nflxso.net 子域；未保存或发布完整 URL、真实图片或观看记录。该证据支持其作为原应用主动向桌面提供的海报来源，不等同于 Netflix 对本项目的授权、全部版本保证或图片再分发许可。
 
-[Netflix 服务条款](https://help.netflix.com/legal/termsofuse)限制个人非商业使用，并限制未经授权的自动获取、复制及再分发。本功能不登录平台、不访问目录/私有接口、不生成图片地址、不改变付费或 DRM 限制，只在电视本地显示原应用已发布记录的图片；不把图片随 APK、Git、文档截图或服务再分发。不将 Android API 的公开性解释为第三方服务或素材的全面许可。商业服务、批量抓取、规则自动分发或新的图片来源仍须另外审查。
+[Netflix 服务条款](https://help.netflix.com/legal/termsofuse)限制个人非商业使用，并限制未经授权的自动获取、复制及再分发。本功能不登录平台、不访问目录/私有接口、不生成图片地址、不改变付费或 DRM 限制，只在电视本地显示原应用已发布记录的图片。2026-10-16 的初始审查不包含向 APK、Git、文档截图或服务分发图片；2026-10-20 所有者指定的单张完整界面截图另按下方增量记录处理。不将 Android API 的公开性解释为第三方服务或素材的全面许可。商业服务、批量抓取、规则自动分发或新的图片来源仍须另外审查。
 
 产品边界：规则省略 artwork 即不读取系统海报；httpsHosts 为空仅可读取来源应用拥有的公开 content URI。网络海报必须在导入 JSON 中明确声明 HTTPS 主机并限定目标应用签名，用户看到网络说明后主动启用规则；本项目不内置 Netflix 网络规则或自动开启。所有者本次明确要求显示 Netflix 封面，授权在其电视启用该配置。
 
@@ -13,3 +13,9 @@ Android 的[公开 Watch Next 契约](https://developer.android.com/training/tv/
 构建审查只允许 JsonHttp.java（天气）与 WatchNextArtwork.java（此来源）创建网络连接，新增客户端不能继承本例外。没有声称法律风险为零；如权利人提出具体争议，按 SECURITY.md 核查并暂停相应来源。
 
 海报可通过可选 queryKeys 声明最多 8 个公开图片参数名，要求实际集合完全匹配、无重复、值为有界标识；缺省不接受任何查询。禁止凭据/账号/资料/会话参数。Netflix 实测 poster 使用 client、deviceTypeId、platform，不能因有查询就误判其没有海报；不存或发布参数值。来源服务器也会看到这些发布者附加参数。
+
+## 2026-10-20：所有者指定的文档截图
+
+所有者明确要求用已有的 `diagnostic-frame.png` 替换 README 图片，并要求先审阅稿件再发布。仅将该画面复制为 `docs/images/quiettv-home.png`，不新增海报下载或扩大规则来源。[截图记录](SCREENSHOTS.md)列出生成方法、版本、文件摘要、可见观看信息及隐私检查；[第三方说明](../THIRD_PARTY_NOTICES.md)明确标志、海报与标题不纳入 MIT。
+
+这是一张用于说明桌面行为的完整界面图片，不作为独立海报资源分发，不进入 APK。所有者对截图的选择不是 Netflix 或其他权利人的再许可，本记录也不作法律无风险结论；维护者已于 2026-10-20 审阅并授权发布，具体权利争议按 SECURITY.md 核查处理。其他截图、规则或媒体不能自动继承此单图范围。

@@ -1,0 +1,100 @@
+name: 提交你的设备验证结果 / Device report
+description: 分享续播或桌面表现；成功、失败和未测项都可以记录。Share what actually happened.
+title: "[设备验证 / Device] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢留下可复用的设备证据。请用中文或 English 填写，不知道的项目写“未知 / unknown”。
+        请勿上传账号、IP、设备序列号、完整播放链接、第三方 APK、私人日志或未脱敏截图。
+        Share only sanitized observations. A progress bar or successful import does not by itself prove playback resumed.
+  - type: input
+    id: quiettv
+    attributes:
+      label: QuietTV 版本与来源 / Version and build source
+      placeholder: "例如：0.14.2 官方 Release；或个人构建 + 源码 commit"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: 设备、Android 与固件版本 / Device, Android and firmware
+      placeholder: "型号 / Android 版本 / 固件；不要填序列号或 IP"
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: 媒体应用与版本 / Media app and version
+      description: 续播反馈请填写名称、渠道、包名、versionName 和 versionCode；仅反馈桌面可写不适用。
+      placeholder: "App / channel / package / versionName / versionCode, or N/A"
+    validations:
+      required: true
+  - type: input
+    id: rule
+    attributes:
+      label: 适配规则 / Rule
+      description: 规则 ID、revision、公开来源链接；没有规则写无。可附公开签名证书摘要，不能附私钥。
+      placeholder: "Rule ID / revision / public link, or none"
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: 已开启的设置与权限 / Setup and permissions
+      description: 记录开关、规则是否启用、媒体访问或节目表权限、应用是否发布记录；不要贴完整系统日志。
+      placeholder: "History switch / rule enabled / media or TV-listings permission / app setup"
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: 最接近的结果 / Observed outcome
+      options:
+        - 成功续播，并观察了位置 / Resumed; position observed
+        - 按应用历史续播，未核对精确位置 / App-managed resume; exact position unchecked
+        - 只打开内容 / Opened content only
+        - 只打开应用 / Opened app only
+        - 有记录，点击失败 / Record visible; launch failed
+        - 没有记录 / No record
+        - 应用更新后失效 / Regression after app update
+        - 只反馈桌面功能 / Launcher-only report
+        - 未测或其他 / Untested or other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 操作步骤与实际结果 / Steps and observations
+      description: 用“测试内容 A”代替真实片名；区分内容、分集、位置及返回后的进度更新。不必为了填表额外重启或操作电视。
+      value: |
+        日期 / Date:
+        操作步骤 / Steps:
+        1.
+
+        正确内容/分集 / Correct content/episode:
+        续播位置如何确认 / How the resume position was checked:
+        返回后进度是否更新 / Progress after returning:
+        客户端关闭后 / After app closes:
+        重启或资料切换 / Reboot or profile changes: 未测 / not tested
+        若反馈桌面：安装、Home 键、开机进入请分别描述 /
+        For launcher reports, distinguish installation, Home button, and boot:
+    validations:
+      required: true
+  - type: textarea
+    id: limitations
+    attributes:
+      label: 失败、未测项与恢复 / Failures, untested cases and recovery
+      description: 停用或回退规则后怎样？有无重复记录、缺字段、版本不匹配或升级后失效？未做的操作写未测。
+      placeholder: "Known limits, disable/rollback behavior, regressions, or not tested"
+    validations:
+      required: true
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: 公开前确认 / Before sharing
+      options:
+        - label: 我是设备所有者或已获授权；报告如实区分实测、推测与未测。I own the device or have authorization, and have separated observed, inferred, and untested results.
+          required: true
+        - label: 我已移除账号、设备地址、真实观看记录、完整链接与私人日志。I removed accounts, device addresses, real viewing records, full links, and private logs.
+          required: true
