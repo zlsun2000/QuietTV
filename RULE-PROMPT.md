@@ -2,11 +2,31 @@
 
 **中文** · [English](#english) · [回到 README](README.md)
 
+## 快速版：只填应用名
+
+复制下面这段给 AI 即可开始。**不确定时用[完整版](#完整版)**；应用名不足以确定渠道、版本或接口时，AI 应先列出缺口，不能编造可导入文件。
+
+```text
+请为应用「[应用名]」制作 QuietTV 续播适配。
+仓库：https://github.com/zlsun2000/QuietTV
+先读取 RULE-PROMPT.md 完整版、docs/PLAYBACK-RULES.md 和 JSON Schema。
+遵守完整版的默认安全边界，仅调查公开资料，不连接或操作设备。
+不修改应用或系统包，不读取私有数据，不绕过 DRM、广告或会员限制。
+使用现有适配器；核实包名、版本、签名、字段、时间单位和固定入口。
+证据充分时输出 rule.json，verification.status 必须为 unverified。
+仅覆盖有证据的版本，默认不含联网海报，导入后保持停用。
+同时给出简短来源说明、合成样例和需用户验证的事项。
+信息不足时先列出缺口，不猜协议，不生成带占位符的可导入规则。
+不要安装、启用规则、测试播放或提交发布，交给我审阅。
+```
+
+## 完整版
+
 把下面完整代码块复制给 Claude Code、Codex 或其他能读取仓库的 AI，填好方括号。你可以提供自己有权检查的应用和接口资料，让 AI 调查并生成一份可审阅的 JSON。适配利用原应用已有的能力；没有可用接口时，正确结果可能是“暂不支持”。
 
 这不是可执行脚本，也不会自动连接电视。**阅读本文件不等于授权操作设备。** 应用分析须在你有权进行、且符合适用许可及服务条件的范围内；本项目不承诺任意应用都能适配。
 
-## 复制这段 Prompt
+### 复制这段 Prompt
 
 ```text
 请为 QuietTV 制作一份有证据支持的本地续播适配 JSON。
@@ -113,6 +133,26 @@ Watch Next：API 26+，id 使用 providerIdHash；native 路由不带 intent，
 拿到实测结果后，可[提交设备验证](https://github.com/zlsun2000/QuietTV/issues/new?template=device_verification.yml)或贡献到[社区规则库](playback-rules/community/README.md)。分享本 Prompt 时可附 `#vibecoding` `#claudecode`；说明基于哪个 QuietTV 版本，以及哪些结果尚未验证。
 
 ## English
+
+### Quick version: fill in the app name
+
+**When unsure, use the [full version](#full-version).** An app name alone may not identify its distribution, version, or interface. Missing evidence should produce a list of gaps, not an invented importable rule.
+
+```text
+Create a QuietTV playback rule for “[app name]”.
+Repository: https://github.com/zlsun2000/QuietTV
+Read the full RULE-PROMPT.md, docs/PLAYBACK-RULES.md, and JSON Schema first.
+Follow the full prompt's default boundaries; use public evidence only, no device access.
+Do not modify apps/system packages, read private data, or bypass DRM, ads, or subscriptions.
+Use an existing adapter; verify package, version, signer, fields, units, and fixed routes.
+With sufficient evidence, output rule.json with verification.status="unverified".
+Cover only evidenced versions; omit remote artwork and keep imports disabled.
+Include short source notes, synthetic samples, and checks requiring user validation.
+If evidence is missing, list gaps; never guess protocols or emit importable placeholders.
+Do not install, enable, play, submit, or publish; deliver files for my review.
+```
+
+### Full version
 
 Copy the complete block below into Claude Code, Codex, or another assistant with repository access. Fill in the brackets. This is an investigation and authoring prompt, not an executable script or permission to operate a TV. Analyze only material you are authorized to inspect under applicable licenses and service terms.
 

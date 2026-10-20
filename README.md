@@ -67,7 +67,7 @@
 | 预编译 APK | [GitHub Releases](https://github.com/zlsun2000/QuietTV/releases/latest) | 官方说明不提供，需自行构建 | [GitLab Releases](https://gitlab.com/flauncher/flauncher/-/releases) / Google Play | [GitHub Releases](https://github.com/spocky/miproja1/releases) / Google Play |
 | 收费 | 免费，MIT 开源 | MIT 开源；AI 服务费用另计 | 免费、开源 | 基础功能免费，部分个性化功能需 Premium |
 
-来源：[cleanyourtv README](https://github.com/Gathin23/cleanyourtv#readme) · [FLauncher README](https://gitlab.com/flauncher/flauncher/-/raw/master/README.md) · [Projectivy 官网与 Premium 说明](https://projectivylauncher.com/) · [Projectivy 商店说明](https://play.google.com/store/apps/details?id=com.spocky.projengmenu)。
+来源：[cleanyourtv README](https://github.com/Gathin23/cleanyourtv#readme) · [FLauncher 仓库](https://gitlab.com/flauncher/flauncher) · [Projectivy 官网与 Premium 说明](https://projectivylauncher.com/) · [Projectivy 商店说明](https://play.google.com/store/apps/details?id=com.spocky.projengmenu)。
 
 这是功能与操作范围对比，不是同机性能测试，也不是故障概率排名。**不刷机不等于零风险**；停用系统依赖与普通安装的影响不同。未列出功能不代表绝对不存在，欢迎附官方来源纠正。
 
@@ -108,7 +108,7 @@ docs/CUSTOMIZATION.md 和 docs/WRITING.md，保留我已有的未提交修改。
 
 ### 帮我给常用应用做续播适配
 
-**复制 [RULE-PROMPT.md](RULE-PROMPT.md) 里的完整 Prompt**，填入应用、版本和可使用的接口资料。AI 会先整理证据，再为已有接入方式生成 JSON；资料不足时列出缺口，不编造可用配置。
+**复制 [RULE-PROMPT.md 的快速版](RULE-PROMPT.md#快速版只填应用名)**，只填应用名即可开始，生成的规则标为 `unverified`。不确定时用[完整版](RULE-PROMPT.md#完整版)，补充版本和有权提供的接口资料。AI 会先整理证据；资料不足时列出缺口，不编造可用配置。
 
 **一段 Prompt → 一份有来源的 JSON → 一台设备的验证结果 → 一份社区适配。**
 

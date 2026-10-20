@@ -8,13 +8,13 @@ A free, open-source Android TV launcher with your favorite apps, continue watchi
 
 [中文](README.md) · **English**
 
-[Download APK](https://github.com/zlsun2000/QuietTV/releases/latest) · [Installation guide (中文)](docs/INSTALL.md) · [AI rule prompt](RULE-PROMPT.md#english) · [Community rules](playback-rules/community/README.md#english)
+[Download APK](https://github.com/zlsun2000/QuietTV/releases/latest) · [Installation guide](docs/INSTALL.en.md) · [AI rule prompt](RULE-PROMPT.md#english) · [Community rules](playback-rules/community/README.md#english)
 
 </div>
 
 ![QuietTV on a real TV: favorite apps on the left, a Netflix continue-watching card on the right, and inputs below](docs/images/quiettv-home.png)
 
-<p align="center"><sub>QuietTV 0.14.2 · Android 12 TV · An actual screen selected by its owner for publication. The card shows an existing record; playback behavior belongs to the media app. <a href="docs/SCREENSHOTS.md">Capture provenance and third-party artwork</a>.</sub></p>
+<p align="center"><sub>QuietTV 0.14.2 · Android 12 TV · An actual screen selected by its owner for publication. The card shows an existing record; playback behavior belongs to the media app. <a href="docs/SCREENSHOTS.md">Capture provenance and third-party artwork (中文)</a>.</sub></p>
 
 ## Fewer remote presses
 
@@ -36,7 +36,7 @@ For **Android 6.0+ TVs and boxes that allow third-party apps**.
 
 **Installing, handling the Home button, and starting at boot are separate capabilities.** Firmware can restrict each one. Some devices require extra setup or ADB troubleshooting; “no ADB for basic installation” does not cover every permission or adaptation workflow. Keep the stock launcher installed and enabled.
 
-**Upgrading:** official versions 0.13.0–0.14.1 can upgrade directly to 0.14.2 while retaining settings. Version 0.12.0 and earlier used a different signing identity. Uninstalling deletes settings, backgrounds, and history; see the [upgrade and recovery guide (中文)](docs/INSTALL.md#升级) first.
+**Upgrading:** official versions 0.13.0–0.14.1 can upgrade directly to 0.14.2 while retaining settings. Version 0.12.0 and earlier used a different signing identity. Uninstalling deletes settings, backgrounds, and history; see the [upgrade and recovery guide](docs/INSTALL.en.md#upgrading) first.
 
 To switch back, choose the stock launcher in the TV's default-app settings and turn off QuietTV's optional Home-key accessibility service if enabled. Opening another launcher once does not change the default.
 
@@ -69,7 +69,7 @@ Based on official documentation reviewed **2026-10-20**. cleanyourtv was previou
 | Prebuilt APK | [GitHub Releases](https://github.com/zlsun2000/QuietTV/releases/latest) | Officially build it yourself | [GitLab Releases](https://gitlab.com/flauncher/flauncher/-/releases) / Google Play | [GitHub Releases](https://github.com/spocky/miproja1/releases) / Google Play |
 | Cost | Free, MIT source | MIT source; AI services may cost extra | Free, open source | Free core features; some personalization requires Premium |
 
-Sources: [cleanyourtv README](https://github.com/Gathin23/cleanyourtv#readme), [FLauncher README](https://gitlab.com/flauncher/flauncher/-/raw/master/README.md), [Projectivy website / Premium FAQ](https://projectivylauncher.com/), [Projectivy store listing](https://play.google.com/store/apps/details?id=com.spocky.projengmenu).
+Sources: [cleanyourtv README](https://github.com/Gathin23/cleanyourtv#readme), [FLauncher repository](https://gitlab.com/flauncher/flauncher), [Projectivy website / Premium FAQ](https://projectivylauncher.com/), [Projectivy store listing](https://play.google.com/store/apps/details?id=com.spocky.projengmenu).
 
 This compares documented features and operations, not measured failure rates or performance on identical hardware. **No flashing does not mean zero risk.** An unlisted feature is not proof of absence; corrections with primary sources are welcome.
 
@@ -84,7 +84,7 @@ Help me install QuietTV: https://github.com/zlsun2000/QuietTV
 TV model: [fill in]; Android version: [fill in or unknown].
 Method: [USB drive / ADB]; if ADB, target: [provide locally, never publish].
 
-Read the repository README and docs/INSTALL.md first. Prefer the APK from
+Read README.en.md and docs/INSTALL.en.md first. Prefer the APK from
 the latest official stable Release; check its published hash and signing
 information. Do not build from source just to install the official app.
 For USB, give clear steps. By selecting ADB, I authorize installation or
@@ -117,7 +117,7 @@ wait for explicit authorization before installing on a TV or publishing.
 
 ### Adapt another media app
 
-**Copy the full [RULE-PROMPT.md prompt](RULE-PROMPT.md#english)** and supply the app, version, and interfaces you are authorized to inspect. The assistant gathers evidence before generating JSON for an existing adapter. Missing evidence should produce a list of unknowns, not an invented working integration.
+**Copy the [quick rule prompt](RULE-PROMPT.md#quick-version-fill-in-the-app-name)** and fill in just the app name. Generated rules are marked `unverified`. When unsure, use the [full version](RULE-PROMPT.md#full-version) with version information and interfaces you are authorized to inspect. Missing evidence should produce a list of unknowns, not an invented working integration.
 
 **One prompt → one sourced JSON rule → one device report → one community contribution.**
 
@@ -140,6 +140,6 @@ Sharing your own setup or original rule? Add `#vibecoding` `#claudecode`, the pr
 
 ## More
 
-[Install / recover (中文)](docs/INSTALL.md) · [Compatibility (中文)](docs/COMPATIBILITY.md) · [AI customization (中文)](docs/CUSTOMIZATION.md) · [Build (中文)](docs/BUILD.md) · [Contribute (中文)](CONTRIBUTING.md) · [Changelog (中文)](CHANGELOG.md)
+[Install / recover](docs/INSTALL.en.md) · [Compatibility (中文)](docs/COMPATIBILITY.md) · [AI customization (中文)](docs/CUSTOMIZATION.md) · [Build (中文)](docs/BUILD.md) · [Contribute (中文)](CONTRIBUTING.md) · [Changelog (中文)](CHANGELOG.md)
 
-Source code is [MIT-licensed](LICENSE). See [privacy](PRIVACY.md), [third-party notices](THIRD_PARTY_NOTICES.md), and [source review](docs/LEGAL-REVIEW.md) (中文). Third-party media, trademarks, apps, and service access are not licensed by this repository's MIT license. No affiliation or endorsement is implied.
+Source code is [MIT-licensed](LICENSE). See [privacy (中文)](PRIVACY.md), [third-party notices (中文)](THIRD_PARTY_NOTICES.md), and [source review (中文)](docs/LEGAL-REVIEW.md). Third-party media, trademarks, apps, and service access are not licensed by this repository's MIT license. No affiliation or endorsement is implied.
