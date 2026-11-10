@@ -38,7 +38,8 @@ function Guest {
 }
 $model=Guest shell getprop ro.product.model
 $fingerprint=Guest shell getprop ro.build.fingerprint
-if(($model -notmatch 'sdk|Emulator') -and ($fingerprint -notmatch 'generic')){throw 'Refusing tests outside a synthetic emulator'}
+$officialApi34Tv=($fingerprint -match '^google/sdk_google_atv_x86/emulator_x86_arm:14/') -and ((Guest shell getprop ro.kernel.qemu) -eq '1') -and ((Guest shell getprop ro.hardware) -eq 'ranchu')
+if(($model -notmatch 'sdk|Emulator') -and ($fingerprint -notmatch 'generic') -and -not $officialApi34Tv){throw 'Refusing tests outside a synthetic emulator'}
 $out=Join-Path $project 'build\device-checks'
 New-Item -ItemType Directory -Path (Join-Path $project 'emulator-local') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $project "emulator-local\$Serial") -Force | Out-Null

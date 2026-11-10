@@ -92,7 +92,7 @@ public final class DeviceChecks extends Instrumentation {
     }
     @Override public void onStart(){Bundle result=new Bundle();try{
         // A hardware TV must never receive these synthetic upgrade preferences.
-        boolean virtual=Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator");
+        boolean virtual=Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")||(Build.FINGERPRINT.startsWith("google/sdk_google_atv_x86/emulator_x86_arm:14/")&&"ranchu".equals(Build.HARDWARE));
         check(virtual,"only a synthetic emulator may run device checks");
         Context c=getTargetContext();SharedPreferences home=c.getSharedPreferences("home",0),history=c.getSharedPreferences("playback_history",0);
         if("fresh".equals(phase))legacyDelivery(c);
@@ -143,13 +143,14 @@ public final class DeviceChecks extends Instrumentation {
             check(background.getCanonicalPath().startsWith(wallpapers.library().getCanonicalPath()+File.separator),"import stays in the application library");
             home.edit().putString("wallpaper_kind","builtin").commit();runOnMainSync(()->activity.render());awaitFrames(activity);
             // Simulate old-version preferences, then let the runner perform an actual install -r.
-            home.edit().remove("config_schema").putStringSet("favorites",new HashSet<>(Arrays.asList("com.example.saved"))).putString("wallpaper_kind","theme").putInt("theme",2).putString("groups","[{\"id\":\"favorites\",\"title\":\"Saved category\",\"row\":true},{\"id\":\"all\",\"title\":\"Apps\",\"row\":false}]").commit();
+            home.edit().remove("config_schema").remove("home_split_rows").remove("home_show_favorites").putStringSet("favorites",new HashSet<>(Arrays.asList("com.example.saved"))).putString("wallpaper_kind","theme").putInt("theme",2).putString("groups","[{\"id\":\"favorites\",\"title\":\"Saved category\",\"row\":true},{\"id\":\"all\",\"title\":\"Apps\",\"row\":false}]").commit();
             history.edit().remove("config_schema").putBoolean("enabled",false).putBoolean("generic_enabled",true).putBoolean("music_enabled",false).putString("records","[{\"id\":\"123456\",\"eid\":\"789\",\"title\":\"Synthetic legacy upgrade\",\"command\":\"tcl/ugc\",\"position\":123456,\"duration\":600000,\"updated\":1}]").commit();
             PlaybackRules registry=PlaybackRules.get(c);JSONObject custom=new JSONObject(registry.find(PlaybackRule.BILI).json.toString()).put("id","example.upgrade").put("name","Synthetic upgrade rule");PlaybackRule upgradeRule=registry.parse(custom.toString());registry.install(upgradeRule);registry.enabled(registry.find(PlaybackRule.BILI),false);registry.enabled(registry.find(upgradeRule.id),true);
         }else if("upgrade".equals(phase)){
             check(home.getInt("config_schema",0)==1&&history.getInt("config_schema",0)==1,"legacy preferences migrate on open");
             check(home.getStringSet("favorites",Collections.emptySet()).contains("com.example.saved"),"covering install preserves favorites");
             check(home.getString("groups","").contains("Saved category"),"category labels survive upgrade");
+            check(!home.getBoolean("home_split_rows",false)&&home.getBoolean("home_show_favorites",true),"legacy upgrade defaults to side-by-side and shows favorites");
             check("theme".equals(home.getString("wallpaper_kind",""))&&home.getInt("theme",0)==2,"wallpaper selection survives upgrade");
             check(!history.getBoolean("enabled",true)&&history.getBoolean("generic_enabled",false)&&!history.getBoolean("music_enabled",true),"explicit legacy choices survive migration");
             ArrayList<PlaybackRecord> retained=new HistoryStore(c).list();check(retained.size()==1&&retained.get(0).key().equals("tcl/ugc|123456|789")&&retained.get(0).position==123456&&retained.get(0).duration==600000,"legacy record identity and progress survive covering install");

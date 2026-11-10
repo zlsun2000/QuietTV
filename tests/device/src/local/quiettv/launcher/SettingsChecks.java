@@ -27,9 +27,9 @@ public final class SettingsChecks extends Instrumentation {
     private void page(int title,int focus,String name)throws Exception{main(()->{Dialog d=dialog();check(d!=null&&d.isShowing(),name+" remains in settings");TextView heading=d.getWindow().getDecorView().findViewWithTag("settings-title");check(heading.getText().toString().equals(activity.getString(title)),name+" returns to the correct page");if(focus>=0)check(d.getCurrentFocus()==option(focus),name+" retains the selected action");});}
     @Override public void onCreate(Bundle args){super.onCreate(args);start();}
     @Override public void onStart(){Bundle result=new Bundle();try{
-        if(!(Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")))throw new AssertionError("Disposable emulator only");
+        if(!(Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")||(Build.FINGERPRINT.startsWith("google/sdk_google_atv_x86/emulator_x86_arm:14/")&&"ranchu".equals(Build.HARDWARE))))throw new AssertionError("Disposable emulator only");
         Context c=getTargetContext();SharedPreferences home=c.getSharedPreferences("home",0),history=c.getSharedPreferences("playback_history",0);
-        home.edit().putBoolean("setup_seen",true).putBoolean("wallpaper_motion",true).putBoolean("banners",true).putString("wallpaper_kind","builtin").commit();
+        home.edit().putBoolean("setup_seen",true).putBoolean("wallpaper_motion",true).putBoolean("banners",true).putString("wallpaper_kind","builtin").remove("home_split_rows").remove("home_show_favorites").commit();
         history.edit().putInt("config_schema",1).putBoolean("enabled",false).putBoolean("generic_enabled",false).commit();c.getSharedPreferences("weather",0).edit().clear().commit();
         ActivityMonitor monitor=addMonitor(MainActivity.class.getName(),null,false);c.startActivity(new Intent().setComponent(new ComponentName(c,MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));activity=(MainActivity)waitForMonitorWithTimeout(monitor,10000);removeMonitor(monitor);if(activity==null)throw new AssertionError("No launcher");frames();Thread.sleep(800);frames();
         main(activity::showSettings);frames();page(R.string.toolbar_home_settings,0,"settings root");
@@ -45,6 +45,13 @@ public final class SettingsChecks extends Instrumentation {
             for(int index:new int[]{0,4}){final int i=index;main(()->option(i).requestFocus());frames();main(()->{View button=option(i);Rect visible=new Rect();check(button.getGlobalVisibleRect(visible)&&visible.height()==button.getHeight(),"large-font action "+i+" is completely reachable");});}
         }finally{main(()->activity.getResources().updateConfiguration(original,activity.getResources().getDisplayMetrics()));}
         main(()->dialog().cancel());frames();main(()->check(dialog()==null,"Back from settings root closes the panel"));
+        main(activity::showSettings);frames();click(5);click(0);click(1);
+        check(home.getBoolean("home_split_rows",false)&&!home.getBoolean("home_show_favorites",true),"home layout switches save both choices");
+        ActivityMonitor recreated=addMonitor(MainActivity.class.getName(),null,false);main(activity::recreate);
+        MainActivity next=(MainActivity)waitForMonitorWithTimeout(recreated,10000);removeMonitor(recreated);if(next==null)throw new AssertionError("No recreated launcher");activity=next;frames();
+        main(activity::showSettings);frames();click(5);page(R.string.settings_home_layout,0,"home layout after recreation");
+        main(()->{check(((TextView)option(0)).getText().toString().equals(activity.settingState(activity.getString(R.string.home_split_rows),true)),"split choice is restored after Activity recreation");check(((TextView)option(1)).getText().toString().equals(activity.settingState(activity.getString(R.string.home_show_favorites),false)),"favorite visibility choice is restored after Activity recreation");});
+        home.edit().remove("home_split_rows").remove("home_show_favorites").commit();
         result.putString("passed",checks+" settings navigation checks");finish(Activity.RESULT_OK,result);
     }catch(Throwable error){result.putString("failed",error.toString());finish(Activity.RESULT_CANCELED,result);}}
 }

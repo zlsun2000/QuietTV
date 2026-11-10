@@ -15,7 +15,7 @@ public final class CheckDocuments extends ContentProvider {
     @Override public String getType(Uri uri){return "/rule".equals(uri.getPath())?"application/json":"image/png";}
     @Override public Cursor query(Uri uri,String[] projection,String selection,String[] args,String order){MatrixCursor c=new MatrixCursor(new String[]{OpenableColumns.DISPLAY_NAME});c.addRow(new Object[]{"../../private.png"});return c;}
     @Override public ParcelFileDescriptor openFile(Uri uri,String mode)throws FileNotFoundException{
-        boolean virtual=Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator");
+        boolean virtual=Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")||(Build.FINGERPRINT.startsWith("google/sdk_google_atv_x86/emulator_x86_arm:14/")&&"ranchu".equals(Build.HARDWARE));
         if(!virtual)throw new FileNotFoundException("Only a synthetic emulator may use test documents");
         if(!"r".equals(mode))throw new FileNotFoundException("Unknown test document");
         if("/rule".equals(uri.getPath())){File rule=new File(getContext().getCacheDir(),"synthetic-rule.json");try(InputStream input=getContext().getAssets().open("example-broadcast.json");OutputStream output=new FileOutputStream(rule)){byte[] bytes=new byte[4096];int count;while((count=input.read(bytes))!=-1)output.write(bytes,0,count);}catch(IOException e){throw new FileNotFoundException("Synthetic rule unavailable");}return ParcelFileDescriptor.open(rule,ParcelFileDescriptor.MODE_READ_ONLY);}

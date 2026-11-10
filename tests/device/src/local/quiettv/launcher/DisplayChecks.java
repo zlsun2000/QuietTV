@@ -23,6 +23,26 @@ public final class DisplayChecks extends Instrumentation {
     private void holdLayout(MainActivity a,boolean hold)throws Exception {if(Build.VERSION.SDK_INT>=29)main(()->ViewGroup.class.getMethod("suppressLayout",boolean.class).invoke(field(a,"root"),hold));}
     @SuppressWarnings("unchecked") private ArrayList<MainActivity.CardRow> rows(MainActivity a)throws Exception {return (ArrayList<MainActivity.CardRow>)field(a,"cardRows");}
     private int visible(MainActivity activity)throws Exception {int n=0;HashSet<android.graphics.Rect> bands=new HashSet<>();for(MainActivity.CardRow row:rows(activity))if(row.fullyVisible()&&bands.add(row.cardBounds()))n++;return n;}
+    @SuppressWarnings("unchecked") private ArrayList<ArrayList<View>> focusRows(MainActivity a)throws Exception{return (ArrayList<ArrayList<View>>)field(a,"focusRows");}
+    private int rowContaining(MainActivity a,String prefix)throws Exception{ArrayList<ArrayList<View>> graph=focusRows(a);for(int i=0;i<graph.size();i++)for(View v:graph.get(i))if(v.getTag()!=null&&v.getTag().toString().startsWith(prefix))return i;return -1;}
+    private void choose(MainActivity a,int index)throws Exception{main(()->{Dialog dialog=(Dialog)field(a,"sheet");View choice=dialog.getWindow().getDecorView().findViewWithTag("settings-option:"+index);if(choice==null)throw new AssertionError("Missing settings choice "+index);choice.requestFocus();choice.performClick();});frames(a);}
+    private void homeLayout(MainActivity a,SharedPreferences home)throws Exception{
+        // Model an existing 0.14.x home store: no new keys and no recent group.
+        // The app list and enabled synthetic playback record are the display fixture.
+        main(()->{home.edit().remove("home_split_rows").remove("home_show_favorites").putString("groups","[{\"id\":\"favorites\",\"title\":\"Favorites\",\"row\":false},{\"id\":\"all\",\"title\":\"Synthetic grid\",\"row\":false}]").commit();a.loadGroups();a.render();});frames(a);
+        main(()->{int favorite=rowContaining(a,"favorites|"),recent=rowContaining(a,"recent|");check(favorite>0&&favorite==recent,"legacy home defaults to the shared favorite/recent band");check(!home.contains("home_split_rows")&&!home.contains("home_show_favorites"),"legacy defaults need no migration or preference reset");});
+        main(a::showSettings);frames(a);choose(a,5);choose(a,0);
+        main(()->{int favorite=rowContaining(a,"favorites|"),recent=rowContaining(a,"recent|");check(home.getBoolean("home_split_rows",false),"split switch is saved");check(favorite>0&&recent>favorite,"split switch creates separate ordered rows");int favoriteCards=0;for(View v:focusRows(a).get(favorite))if(v.getTag()!=null&&v.getTag().toString().startsWith("favorites|"))favoriteCards++;check(favoriteCards==3,"split favorites is one horizontal row despite legacy grid preference");});
+        // Move recent past inputs and then favorites past both via the real category editor.
+        main(a::showGroups);frames(a);choose(a,1);choose(a,1);main(a::showGroups);frames(a);choose(a,0);choose(a,2);choose(a,2);
+        main(()->{int favorite=rowContaining(a,"favorites|"),recent=rowContaining(a,"recent|");check(recent>0&&favorite>recent,"category move controls reorder both independent rows");a.loadGroups();a.render();});frames(a);
+        main(()->check(rowContaining(a,"recent|")>0&&rowContaining(a,"favorites|")>rowContaining(a,"recent|"),"group order survives reload from legacy-upgraded preferences"));
+        main(a::showHomeLayout);frames(a);choose(a,1);
+        main(()->{check(!home.getBoolean("home_show_favorites",true),"favorites visibility switch is saved");check(rowContaining(a,"favorites|")==-1&&rowContaining(a,"recent|")>0,"hidden favorites leave an independent recent row");});
+        choose(a,0);
+        main(()->{check(!home.getBoolean("home_split_rows",true)&&!home.getBoolean("home_show_favorites",true),"both switch values survive reopening and toggling");check(rowContaining(a,"favorites|")==-1&&rowContaining(a,"recent|")>0,"hidden favorites leave recent independent in default layout");});
+        main(()->{Dialog dialog=(Dialog)field(a,"sheet");if(dialog!=null)dialog.dismiss();home.edit().remove("home_split_rows").remove("home_show_favorites").commit();a.render();});frames(a);
+    }
     private void capacity(MainActivity a,String label)throws Exception {
         main(()->{if(((ArrayList<?>)field(a,"apps")).size()!=42)throw new AssertionError("Synthetic layout fixture was replaced during "+label);});
         final int[] actual={0},expected={0};final boolean[] focused={false};main(()->{View focus=a.getCurrentFocus();actual[0]=visible(a);if(focus==null||!(focus.getParent() instanceof MainActivity.CardRow))return;MainActivity.CardRow row=(MainActivity.CardRow)focus.getParent();focused[0]=row.fullyVisible();android.graphics.Rect bounds=row.cardBounds();MainActivity.CardScroll scroll=(MainActivity.CardScroll)field(a,"scroll");View content=(View)field(a,"content");HashSet<android.graphics.Rect> bands=new HashSet<>();for(MainActivity.CardRow r:rows(a))bands.add(r.cardBounds());for(int y=Math.max(0,bounds.bottom-scroll.getHeight());y<=Math.min(bounds.top,content.getHeight()-scroll.getHeight());y++){int n=0;for(android.graphics.Rect r:bands)if(r.top>=y&&r.bottom<=y+scroll.getHeight())n++;expected[0]=Math.max(expected[0],n);}});
@@ -30,7 +50,7 @@ public final class DisplayChecks extends Instrumentation {
         check(focused[0],label+" focused row is complete");check(actual[0]==expected[0],label+" complete-row capacity "+actual[0]+" == "+expected[0]);
     }
     @Override public void onStart(){Bundle result=new Bundle();MainActivity activity=null;try{
-        boolean virtual=Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator");if(!virtual)throw new AssertionError("Only a disposable emulator may run regressions");
+        boolean virtual=Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")||(Build.FINGERPRINT.startsWith("google/sdk_google_atv_x86/emulator_x86_arm:14/")&&"ranchu".equals(Build.HARDWARE));if(!virtual)throw new AssertionError("Only a disposable emulator may run regressions");
         Context c=getTargetContext();SharedPreferences home=c.getSharedPreferences("home",0),history=c.getSharedPreferences("playback_history",0);
         home.edit().putBoolean("setup_seen",true).putString("groups","[{\"id\":\"all\",\"title\":\"Synthetic grid\",\"row\":false}]").putString("wallpaper_kind","builtin").commit();history.edit().putBoolean("enabled",false).commit();
         ActivityMonitor monitor=addMonitor(MainActivity.class.getName(),null,false);c.startActivity(new Intent().setComponent(new ComponentName(c,MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));activity=(MainActivity)waitForMonitorWithTimeout(monitor,10000);removeMonitor(monitor);if(activity==null)throw new AssertionError("No launcher");final MainActivity a=activity;frames(a);Thread.sleep(1200);frames(a);
@@ -77,6 +97,7 @@ public final class DisplayChecks extends Instrumentation {
             for(int step=0;step<4;step++){sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP);frames(a);capacity(a,"scenario "+scenario+" up "+step);}
         }
         if(focusRefreshOnly){result.putString(failures.isEmpty()?"passed":"failed",count+" focus refresh checks; failures="+failures.toString());finish(failures.isEmpty()?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);return;}
+        homeLayout(a,home);
         Wallpapers wallpaper=(Wallpapers)field(a,"wallpapers");File video=SyntheticVideo.create(new File(c.getCacheDir(),"synthetic-wallpaper.mp4"));CountDownLatch imported=new CountDownLatch(1);final boolean[] ok={false};wallpaper.importFile(video,(success,isVideo)->{ok[0]=success&&isVideo;imported.countDown();});check(imported.await(10,TimeUnit.SECONDS)&&ok[0],"synthetic silent video imports");main(a::render);
         long deadline=SystemClock.uptimeMillis()+10000;while(SystemClock.uptimeMillis()<deadline){frames(a);final boolean[] ready={false};main(()->ready[0]=wallpaper.videoCapability().isAvailable());if(ready[0])break;}
         final Object[] original=new Object[4];final long[] before={0};main(()->{original[0]=field(wallpaper,"layer");original[1]=field(wallpaper,"texture");original[2]=field(wallpaper,"surface");original[3]=field(wallpaper,"player");before[0]=(Long)field(wallpaper,"videoFrames");});check(original[3]!=null&&before[0]>0,"video decoder produces actual frames");

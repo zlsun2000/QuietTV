@@ -115,6 +115,12 @@
     <string name="video_frames_output">视频帧正在输出；跨设备解码仍需验证</string>
     <string name="setting_on">已开启</string>
     <string name="setting_off">已关闭</string>
+    <string name="settings_home_layout">主页布局</string>
+    <string name="home_layout_hint">默认并排显示常用应用和继续播放；分行后可在应用与分类 → 分类管理中调整顺序。</string>
+    <string name="home_split_rows">分行显示</string>
+    <string name="home_show_favorites">显示常用应用</string>
+    <string name="recent_order_hint">开启主页布局中的分行显示后，继续播放按此分类顺序显示。</string>
+    <string name="favorite_order_hint">分行显示时常用应用为横向一排，并按此分类顺序显示。</string>
     <string name="settings_summary">更改自动保存，返回键返回上一级。</string>
     <string name="settings_close_hint">返回键关闭设置</string>
     <string name="settings_back_hint">返回键返回上一级</string>
