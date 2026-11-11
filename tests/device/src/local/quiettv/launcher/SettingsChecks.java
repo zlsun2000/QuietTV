@@ -23,7 +23,16 @@ public final class SettingsChecks extends Instrumentation {
     private View controlView(String tag)throws Exception{return dialog().getWindow().getDecorView().findViewWithTag(tag);}
     private View tab(ControlCenter.Section section)throws Exception{return controlView("control-tab:"+section.name());}
     private View action(String key)throws Exception{return controlView("control-action:"+key);}
-    private void frames()throws Exception{CountDownLatch latch=new CountDownLatch(1);main(()->activity.getWindow().getDecorView().postOnAnimation(()->activity.getWindow().getDecorView().postOnAnimation(latch::countDown)));if(!latch.await(10,TimeUnit.SECONDS))throw new AssertionError("No rendered frames");Thread.sleep(120);}
+    private void frames() throws Exception {
+        CountDownLatch latch = new CountDownLatch(1);
+        // The decor view can detach during Activity recreation on older Android TV.
+        main(() -> {
+            Choreographer scheduler = Choreographer.getInstance();
+            scheduler.postFrameCallback(first -> scheduler.postFrameCallback(second -> latch.countDown()));
+        });
+        if (!latch.await(10, TimeUnit.SECONDS)) throw new AssertionError("No UI frames");
+        Thread.sleep(120);
+    }
     private void check(boolean ok,String name){checks++;if(!ok)throw new AssertionError(name);Bundle b=new Bundle();b.putString("check",name);sendStatus(0,b);}
     private void click(int index)throws Exception{main(()->{View button=option(index);if(button==null)throw new AssertionError("Missing settings action "+index);button.requestFocus();button.performClick();});frames();}
     private void clickAction(String key)throws Exception{
@@ -123,8 +132,18 @@ public final class SettingsChecks extends Instrumentation {
         check(home.getBoolean("home_split_rows",false)&&!home.getBoolean("home_show_favorites",true)
                 &&history.getBoolean("enabled",false)&&!home.getBoolean("home_show_inputs",true),"home layout saves all four switches");
         back();page(R.string.toolbar_home_settings,5,"layout Back from desktop settings");
-        ActivityMonitor recreated=addMonitor(MainActivity.class.getName(),null,false);main(activity::recreate);
-        MainActivity next=(MainActivity)waitForMonitorWithTimeout(recreated,10000);removeMonitor(recreated);if(next==null)throw new AssertionError("No recreated launcher");activity=next;frames();
+        MainActivity previous=activity;
+        ActivityMonitor recreated=addMonitor(MainActivity.class.getName(),null,false);
+        main(previous::recreate);
+        MainActivity next=(MainActivity)waitForMonitorWithTimeout(recreated,10000);
+        removeMonitor(recreated);
+        if(next==null||next==previous)throw new AssertionError("No recreated launcher");
+        activity=next;
+        frames();
+        main(()->{
+            if(!activity.getWindow().getDecorView().isAttachedToWindow())
+                throw new AssertionError("Recreated launcher window is detached");
+        });
         main(activity::showControlCenter);frames();controlPage(ControlCenter.Section.HOME,null);
         main(()->{
             String[] keys={"split","favorites","playback","inputs"};
