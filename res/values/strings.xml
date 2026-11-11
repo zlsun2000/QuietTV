@@ -138,6 +138,9 @@
     <string name="control_home_unknown">默认桌面未确认</string>
     <string name="control_desktop_settings_hint">外观、应用、继续播放、天气与系统</string>
     <string name="control_input_settings">输入设置</string>
+    <string name="control_refresh_inputs">刷新信号源</string>
+    <string name="control_input_system">打开系统输入设置</string>
+    <string name="control_input_setup_hint">刷新电视提供的信号源；系统输入设置可用时，可继续调整设备提供的选项。</string>
     <string name="control_no_inputs">没有检测到可用的信号源</string>
     <string name="control_network_unavailable">系统未提供可打开的网络设置</string>
     <string name="control_appearance_summary">背景与卡片外观</string>
@@ -149,6 +152,7 @@
     <string name="control_system_summary">默认桌面与系统入口</string>
     <string name="control_layout_split">常用应用与继续播放分行</string>
     <string name="control_layout_side">常用应用与继续播放并排</string>
+    <string name="control_layout_hidden">常用应用已隐藏</string>
     <string name="home_layout_hint">默认并排显示常用应用和继续播放；分行后可在应用与分类 → 分类管理中调整顺序。</string>
     <string name="home_split_rows">分行显示</string>
     <string name="home_show_favorites">显示常用应用</string>

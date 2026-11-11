@@ -38,6 +38,11 @@ public class MainActivity extends Activity {
     private CardScroll scroll;
     private TextView clock,dateLabel,hint,selectionTitle,selectionSubtitle;
     private Dialog sheet;
+    private ControlCenter controlCenter;
+    private boolean controlWarmScheduled;
+    private boolean controlWarmDone,controlCenterStale;
+    private int controlCenterFocus;
+    private boolean appearanceFromControl;
     private final HashMap<String,Integer> settingsFocus=new HashMap<>();
     private Runnable settingsReturn;
     private boolean settingsOpen;
@@ -60,7 +65,7 @@ public class MainActivity extends Activity {
     private final BroadcastReceiver historyChanged=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(foreground&&prefs!=null&&!manage){refreshHistoryCards();if(biliMetadata!=null)biliMetadata.refresh();}}};
     private boolean foreground=false,startupShown=false,unlockReceiverRegistered=false,packageReceiverRegistered=false,timeReceiverRegistered=false,appsDirty=true,appsLoading=false,appsUiDirty=true;
     private final Runnable waitForUnlock=new Runnable(){public void run(){if(foreground&&prefs==null)resumeHome();}};
-    private final Runnable resizeHome=new Runnable(){public void run(){if(!foreground||prefs==null||root==null)return;int w=root.getWidth(),h=root.getHeight();if(w<=0||h<=0)return;float scale=UiMetrics.scale(w,h);int units=UiMetrics.units(w,h);if(Math.abs(uiScale-scale)>.001f||designWidth!=units){uiScale=scale;designWidth=units;render();}}};
+    private final Runnable resizeHome=new Runnable(){public void run(){if(!foreground||prefs==null||root==null)return;int w=root.getWidth(),h=root.getHeight();if(w<=0||h<=0)return;float scale=UiMetrics.scale(w,h);int units=UiMetrics.units(w,h);if(Math.abs(uiScale-scale)>.001f||designWidth!=units){uiScale=scale;designWidth=units;invalidateControlCenter();render();}}};
     private final BroadcastReceiver userUnlockReceiver=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(Intent.ACTION_USER_UNLOCKED.equals(i.getAction())&&foreground&&prefs==null)resumeHome();}};
     private static class App {String pkg,name;Intent intent;Drawable icon,banner;int color;InputSources.Port port;}
     private static class Group {String id,title;boolean row;Group(String i,String t,boolean r){id=i;title=t;row=r;}}
@@ -109,7 +114,7 @@ public class MainActivity extends Activity {
             initHome();
         }
         confirmHomeKeyReturn(getIntent());WatchNextHistory.refresh();
-        boolean needsRender=appsDirty||appsUiDirty||root==null;loadApps();wallpapers.resume();weather.start();if(needsRender)render();else refreshHistoryCards();handler.removeCallbacks(tick);tick.run();
+        boolean needsRender=appsDirty||appsUiDirty||root==null;loadApps();wallpapers.resume();weather.start();if(needsRender)render();else refreshHistoryCards();scheduleControlWarmup();handler.removeCallbacks(tick);tick.run();
         if(!prefs.getBoolean("setup_seen",false))handler.post(()->{if(foreground&&sheet==null){prefs.edit().putBoolean("setup_seen",true).apply();showSetup();}});
     }
     private void showStartup(){
@@ -130,7 +135,7 @@ public class MainActivity extends Activity {
     private boolean isLowRamDevice(){try{android.app.ActivityManager manager=(android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE);return manager!=null&&manager.isLowRamDevice();}catch(Exception ignored){return false;}}
     @Override public void onPause(){foreground=false;handler.removeCallbacks(waitForUnlock);handler.removeCallbacks(resizeHome);handler.removeCallbacks(tick);if(weather!=null)weather.stop();if(wallpapers!=null)wallpapers.pause();super.onPause();}
     @Override public void onSaveInstanceState(Bundle out){out.putString("quiettv.focus",selected);super.onSaveInstanceState(out);}
-    @Override public void onTrimMemory(int level){super.onTrimMemory(level);if(wallpapers!=null)wallpapers.trimMemory(level);}
+    @Override public void onTrimMemory(int level){super.onTrimMemory(level);if(wallpapers!=null)wallpapers.trimMemory(level);if(level>=android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)invalidateControlCenter();}
     @Override public void onDestroy(){settingsReturn=null;if(sheet!=null){sheet.setOnCancelListener(null);sheet.dismiss();}handler.removeCallbacks(waitForUnlock);handler.removeCallbacks(resizeHome);handler.removeCallbacks(tick);handler.removeCallbacks(reloadApps);if(unlockReceiverRegistered)unregisterReceiver(userUnlockReceiver);if(timeReceiverRegistered)unregisterReceiver(timeChanged);if(historyReceiverRegistered)unregisterReceiver(historyChanged);if(legacyHistoryOwned){LegacyHistoryListener.release();legacyHistoryOwned=false;}if(packageReceiverRegistered)unregisterReceiver(packagesChanged);storageWorker.shutdownNow();if(inputSources!=null)inputSources.dispose();if(weather!=null)weather.dispose();if(covers!=null)covers.dispose();if(biliMetadata!=null)biliMetadata.dispose();if(wallpapers!=null)wallpapers.dispose();super.onDestroy();}
     int dp(float n){return Math.round(n*uiScale);}
     int sp(float n){return Math.round(dp(n)*getResources().getConfiguration().fontScale);}
@@ -183,7 +188,7 @@ public class MainActivity extends Activity {
         LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(48),dp(12),dp(48),dp(6));
         header.setBackgroundColor(0x66071018);
         TextView brand=text(getString(R.string.app_name),ui.brandSize,WHITE);brand.setLetterSpacing(.12f);brand.setTypeface(Typeface.create("sans-serif-medium",0));fitLine(brand,getString(R.string.app_name),ui.brandSize,76);header.addView(brand,new LinearLayout.LayoutParams(dp(76),-2));
-        ArrayList<View> tools=new ArrayList<>();weatherButton=null;if(weather.enabled()){weatherButton=new WeatherButton(this,weather,new Runnable(){public void run(){showWeather();}});header.addView(weatherButton,new LinearLayout.LayoutParams(dp(ui.weatherWidth),dp(42)));tools.add(weatherButton);}header.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));if(hasInputs()||SystemEntrypoints.inputSettings(this)!=null)tools.add(tool(getString(R.string.toolbar_inputs),"input",0,new Runnable(){public void run(){focusInputs();}}));tools.add(tool(getString(R.string.toolbar_tv_settings),"settings",1,new Runnable(){public void run(){openSettings();}}));tools.add(tool(getString(R.string.toolbar_home_settings),"home-settings",2,new Runnable(){public void run(){showSettings();}}));for(View t:tools)if(t!=weatherButton)header.addView(t);focusRows.add(tools);
+        ArrayList<View> tools=new ArrayList<>();weatherButton=null;if(weather.enabled()){weatherButton=new WeatherButton(this,weather,new Runnable(){public void run(){showWeather();}});header.addView(weatherButton,new LinearLayout.LayoutParams(dp(ui.weatherWidth),dp(42)));tools.add(weatherButton);}header.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));tools.add(tool(getString(R.string.control_center),"home-settings",2,new Runnable(){public void run(){showControlCenter();}}));for(View t:tools)if(t!=weatherButton)header.addView(t);focusRows.add(tools);
         page.addView(header,new LinearLayout.LayoutParams(-1,dp(54)));
         LinearLayout hero=new LinearLayout(this);hero.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x66071018,0x55071018,0x00071018}));hero.setGravity(Gravity.BOTTOM);hero.setPadding(dp(48),0,dp(48),dp(8));
         LinearLayout timeBlock=new LinearLayout(this);timeBlock.setBackground(textBackdrop());timeBlock.setOrientation(LinearLayout.VERTICAL);clock=text("",ui.clockSize,WHITE);clock.setTypeface(Typeface.create("sans-serif-light",0));timeBlock.addView(clock);
@@ -201,6 +206,7 @@ public class MainActivity extends Activity {
         }
         hint=text(manage?getString(R.string.remote_organize_hint):getString(R.string.remote_navigation_hint),11,0xffa3b4bf);hint.setPaddingRelative(dp(48),dp(4),dp(48),dp(8));page.addView(hint);
         historyLayout=historyFingerprint();View target=desiredSelection.isEmpty()?null:root.findViewWithTag(desiredSelection);if(target==null)for(ArrayList<View> row:focusRows){if(!row.isEmpty()&&row.get(0).getParent() instanceof CardRow){target=row.get(0);break;}}if(target==null)target=tools.get(0);target.requestFocus();tickClock();
+        scheduleControlWarmup();
     }
     Group findGroup(String id){for(Group g:groups)if(g.id.equals(id))return g;return null;}
     // The first band groups applications and one complete content card side by side.
@@ -255,7 +261,7 @@ public class MainActivity extends Activity {
         final AlertDialog dialog=new AlertDialog.Builder(this).setTitle(R.string.weather_select_city_title).setView(input).setPositiveButton(R.string.search,null).setNegativeButton(R.string.cancel,(d,n)->showWeatherSettings()).create();dialog.setOnCancelListener(d->showWeatherSettings());dialog.setOnShowListener(v->{final Runnable search=new Runnable(){public void run(){final String query=input.getText().toString().trim();if(query.isEmpty()||query.length()>80)return;dialog.dismiss();Toast.makeText(MainActivity.this,R.string.weather_searching,Toast.LENGTH_SHORT).show();weather.search(query,new WeatherRepository.Cities(){public void found(final ArrayList<WeatherRepository.Place> places,String error){if(!foreground)return;if(!error.isEmpty()){Toast.makeText(MainActivity.this,error,Toast.LENGTH_LONG).show();searchWeatherCity();return;}if(places.isEmpty()){Toast.makeText(MainActivity.this,R.string.weather_city_not_found,Toast.LENGTH_LONG).show();searchWeatherCity();return;}String[] names=new String[places.size()+1];for(int i=0;i<places.size();i++)names[i]=places.get(i).label();names[places.size()]="Open-Meteo / GeoNames";settingsPanel("weather-cities",getString(R.string.weather_select_city_title),getString(R.string.weather_city_source),names,i->{if(i==places.size())weatherServiceInfo();else{weather.select(places.get(i));render();showWeatherSettings();}},MainActivity.this::showWeatherSettings);}});}};dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v2->search.run());input.setOnEditorActionListener((v2,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH){search.run();return true;}return false;});});dialog.show();input.requestFocus();
     }
 
-    String settingState(String label,boolean enabled){return label+" · "+getString(enabled?R.string.setting_on:R.string.setting_off);}
+    String settingState(String label,boolean enabled){return label+"  "+(enabled?"●":"○")+" "+getString(enabled?R.string.setting_on:R.string.setting_off);}
     void showContentSettings(){
         settingsPanel("playback",getString(R.string.settings_playback),getString(R.string.playback_summary),new String[]{settingState(getString(R.string.playback_show),history.enabled()),getString(R.string.playback_sources),getString(R.string.settings_advanced)},i->{
             if(i==0){history.enabled(!history.enabled());render();showContentSettings();}
@@ -485,17 +491,43 @@ public class MainActivity extends Activity {
         TextView sub=text(subtitle,13,MUTED);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=dp(10);sp.bottomMargin=dp(24);
         if(scrollInfo){ScrollView information=new ScrollView(this);information.setFocusable(true);information.setVerticalScrollBarEnabled(true);information.addView(sub);sub.measure(View.MeasureSpec.makeMeasureSpec(dp(page.isEmpty()?309:364),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));int available=root==null?dp(720):root.getHeight();sp.height=Math.min(sub.getMeasuredHeight(),Math.max(dp(80),Math.min(dp(280),Math.round(available*.38f))));box.addView(information,sp);}else box.addView(sub,sp);
         ScrollView list=new ScrollView(this);list.setVerticalScrollBarEnabled(false);LinearLayout options=new LinearLayout(this);options.setOrientation(LinearLayout.VERTICAL);list.addView(options);box.addView(list,new LinearLayout.LayoutParams(-1,0,1));
-        for(int i=0;i<choices.length;i++){final int index=i;final TextView button=text(choices[i],16,WHITE);button.setPaddingRelative(dp(16),dp(15),dp(16),dp(15));button.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);button.setFocusable(true);button.setClickable(true);button.setTag("settings-option:"+i);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(6);options.addView(button,lp);button.setBackground(panelButton(false));button.setOnFocusChangeListener(new View.OnFocusChangeListener(){public void onFocusChange(View v,boolean f){button.setBackground(panelButton(f));button.setTextColor(f?0xff142034:WHITE);if(f&&!page.isEmpty())settingsFocus.put(page,index);}});button.setOnClickListener(new View.OnClickListener(){public void onClick(View v){current.dismiss();callback.pick(index);}});}
+        for(int i=0;i<choices.length;i++){final int index=i;String label=choices[i];if(page.equals("settings")){String[] icons={"◐","▦","▶","☀","⚙","▤"};label=icons[i]+"  "+label+"\n     "+settingsGroupSummary(i);}final TextView button=text(label,16,WHITE);if(page.equals("settings"))button.setContentDescription(choices[i]+"，"+settingsGroupSummary(i));button.setPaddingRelative(dp(16),dp(15),dp(16),dp(15));button.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);button.setFocusable(true);button.setClickable(true);button.setTag("settings-option:"+i);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(6);options.addView(button,lp);button.setBackground(panelButton(false));button.setOnFocusChangeListener(new View.OnFocusChangeListener(){public void onFocusChange(View v,boolean f){button.setBackground(panelButton(f));button.setTextColor(f?0xff142034:WHITE);if(f&&!page.isEmpty())settingsFocus.put(page,index);}});button.setOnClickListener(new View.OnClickListener(){public void onClick(View v){current.dismiss();callback.pick(index);}});}
         TextView back=text(getString(parent==null?R.string.settings_close_hint:R.string.settings_back_hint),12,MUTED);back.setPaddingRelative(dp(16),dp(15),0,0);back.setGravity(Gravity.START);box.addView(back);current.setContentView(box);Window w=current.getWindow();if(w!=null){w.setBackgroundDrawableResource(android.R.color.transparent);w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);WindowManager.LayoutParams lp=w.getAttributes();lp.width=dp(page.isEmpty()?365:420);lp.height=-1;lp.gravity=Gravity.END;lp.dimAmount=.45f;w.setAttributes(lp);w.getDecorView().setSystemUiVisibility(5894);}current.setOnDismissListener(new DialogInterface.OnDismissListener(){public void onDismiss(DialogInterface d){if(sheet==current)sheet=null;}});current.setOnCancelListener(d->{if(parent!=null&&!isFinishing())parent.run();else if(!page.isEmpty())settingsOpen=false;});
-        current.show();if(options.getChildCount()>0)options.getChildAt(Math.max(0,Math.min(options.getChildCount()-1,savedFocus==null?0:savedFocus))).requestFocus();
+        if(w!=null&&!page.isEmpty())w.setWindowAnimations(isLowRamDevice()?0:R.style.SettingsFade);current.show();if(options.getChildCount()>0)options.getChildAt(Math.max(0,Math.min(options.getChildCount()-1,savedFocus==null?0:savedFocus))).requestFocus();
     }
     Drawable panelButton(boolean f){GradientDrawable d=new GradientDrawable();d.setCornerRadius(dp(10));d.setColor(f?0xffe7edf6:0xff202d42);return d;}
     Drawable textBackdrop(){GradientDrawable d=new GradientDrawable();d.setCornerRadius(dp(6));d.setColor(0xb30b1923);return d;}
 
+    void invalidateControlCenter(){controlWarmDone=false;if(controlCenter!=null){controlCenterFocus=controlCenter.focusIndex();if(controlCenter.isShowing())controlCenterStale=true;else{controlCenter=null;controlCenterStale=false;}}}
+    void scheduleControlWarmup(){
+        if(controlWarmDone||controlWarmScheduled||isLowRamDevice()||root==null)return;controlWarmScheduled=true;
+        Looper.myQueue().addIdleHandler(()->{controlWarmScheduled=false;if(!foreground||isFinishing()||root==null||root.getHeight()<=0||controlCenterStale||(controlCenter!=null&&controlCenter.isShowing()))return false;if(controlCenter==null){controlCenter=new ControlCenter(this,this::controlChoice);controlCenter.focusIndex(controlCenterFocus);}controlWarmDone=controlCenter.warmUp(root.getHeight());return false;});
+    }
+
+    void showControlCenter(){
+        settingsOpen=true;if(sheet!=null&&sheet!=controlCenter)sheet.dismiss();if(controlCenterStale&&controlCenter!=null&&!controlCenter.isShowing()){controlCenterFocus=controlCenter.focusIndex();controlCenter=null;controlCenterStale=false;}if(controlCenter==null){controlCenter=new ControlCenter(this,this::controlChoice);controlCenter.focusIndex(controlCenterFocus);}
+        final ControlCenter current=controlCenter;current.refresh();current.setOnDismissListener(d->{if(sheet==current)sheet=null;if(controlCenterStale&&controlCenter==current){controlCenterFocus=current.focusIndex();controlCenter=null;controlCenterStale=false;}});current.setOnCancelListener(d->settingsOpen=false);Window window=current.getWindow();if(window!=null)window.setWindowAnimations(isLowRamDevice()?0:R.style.SettingsFade);sheet=current;if(!current.isShowing())current.show();current.focusSaved();
+    }
+    void controlChoice(int index){
+        if(index==0){showControlInputs();return;}
+        if(index==1){Intent network=SystemEntrypoints.first(this,new Intent(Settings.ACTION_WIFI_SETTINGS),new Intent(Settings.ACTION_WIRELESS_SETTINGS));if(network==null){Toast.makeText(this,R.string.control_network_unavailable,Toast.LENGTH_LONG).show();showControlCenter();}else{settingsReturn=this::showControlCenter;launch(network,getString(R.string.control_network));}return;}
+        if(index==2){Intent settings=SystemEntrypoints.settings(this);if(settings==null){openSettings();showControlCenter();}else{settingsReturn=this::showControlCenter;launch(settings,getString(R.string.toolbar_tv_settings));}return;}
+        if(index==3){appearanceFromControl=true;showAppearance();return;}showSettings();
+    }
+    void showControlInputs(){
+        Group inputs=findGroup("inputs");final ArrayList<App> available=inputs==null?new ArrayList<>():groupApps(inputs,false);ArrayList<String> labels=new ArrayList<>();for(App app:available)labels.add(app.name+" · "+inputStatus(app.port));labels.add(getString(R.string.control_input_settings));
+        settingsPanel("control-inputs",getString(R.string.toolbar_inputs),available.isEmpty()?getString(R.string.control_no_inputs):getString(R.string.settings_apps_hint),labels.toArray(new String[0]),i->{if(i<available.size())openApp(available.get(i));else showControlInputSettings();},this::showControlCenter);
+    }
+    void showControlInputSettings(){
+        final Intent system=SystemEntrypoints.inputSettings(this);String[] choices=system==null?new String[]{getString(R.string.control_refresh_inputs)}:new String[]{getString(R.string.control_refresh_inputs),getString(R.string.control_input_system)};
+        settingsPanel("control-input-settings",getString(R.string.control_input_settings),getString(R.string.control_input_setup_hint),choices,i->{if(i==0){refreshInputs();showControlInputSettings();}else if(system!=null){settingsReturn=this::showControlInputSettings;launch(system,getString(R.string.control_input_settings));}},this::showControlInputs);
+    }
+    String settingsGroupSummary(int index){switch(index){case 0:return getString(R.string.control_appearance_summary);case 1:return getString(R.string.control_apps_summary);case 2:return getString(history.enabled()?R.string.control_playback_on:R.string.control_playback_off);case 3:return getString(weather.enabled()?R.string.control_weather_on:R.string.control_weather_off);case 4:return getString(R.string.control_system_summary);default:return getString(!prefs.getBoolean("home_show_favorites",true)?R.string.control_layout_hidden:prefs.getBoolean("home_split_rows",false)?R.string.control_layout_split:R.string.control_layout_side);}}
+
     void showSettings(){
         settingsPanel("settings",getString(R.string.toolbar_home_settings),getString(R.string.settings_summary),new String[]{getString(R.string.settings_appearance),getString(R.string.settings_apps),getString(R.string.settings_playback),getString(R.string.weather_title),getString(R.string.settings_system),getString(R.string.settings_home_layout)},i->{
-            if(i==0)showAppearance();else if(i==1)showAppSettings();else if(i==2)showContentSettings();else if(i==3)showWeatherSettings();else if(i==4)showSystemSettings();else showHomeLayout();
-        },null);
+            if(i==0){appearanceFromControl=false;showAppearance();}else if(i==1)showAppSettings();else if(i==2)showContentSettings();else if(i==3)showWeatherSettings();else if(i==4)showSystemSettings();else showHomeLayout();
+        },this::showControlCenter);
     }
     void showHomeLayout(){
         settingsPanel("home-layout",getString(R.string.settings_home_layout),getString(R.string.home_layout_hint),new String[]{settingState(getString(R.string.home_split_rows),prefs.getBoolean("home_split_rows",false)),settingState(getString(R.string.home_show_favorites),prefs.getBoolean("home_show_favorites",true))},i->{
@@ -512,7 +544,7 @@ public class MainActivity extends Activity {
         settingsPanel("appearance",getString(R.string.settings_appearance),getString(R.string.appearance_hint),new String[]{getString(R.string.appearance_builtin),getString(R.string.appearance_custom),settingState(getString(R.string.appearance_motion),prefs.getBoolean("wallpaper_motion",true)),getString(R.string.appearance_colors),settingState(getString(R.string.appearance_banners),prefs.getBoolean("banners",true))},i->{
             if(i==1){chooseWallpaper();return;}if(i==3){chooseTheme();return;}
             if(i==0)prefs.edit().putString("wallpaper_kind","builtin").apply();else if(i==2)prefs.edit().putBoolean("wallpaper_motion",!prefs.getBoolean("wallpaper_motion",true)).apply();else prefs.edit().putBoolean("banners",!prefs.getBoolean("banners",true)).apply();render();showAppearance();
-        },this::showSettings);
+        },appearanceFromControl?this::showControlCenter:this::showSettings);
     }
     void chooseTheme(){settingsPanel("theme",getString(R.string.appearance_colors),getString(R.string.appearance_colors_hint),new String[]{getString(R.string.theme_ocean),getString(R.string.theme_dusk),getString(R.string.theme_graphite),getString(R.string.theme_forest)},i->{theme=i;prefs.edit().putInt("theme",theme).putString("wallpaper_kind","theme").apply();render();chooseTheme();},this::showAppearance);}
     void chooseWallpaper(){settingsPanel("wallpaper",getString(R.string.appearance_custom),getString(R.string.wallpaper_import_hint),new String[]{getString(R.string.wallpaper_picker),getString(R.string.wallpaper_legacy),getString(R.string.wallpaper_saved,wallpapers.librarySummary()),getString(R.string.appearance_builtin)},i->{if(i==0){pickDocument();return;}if(i==1){if(checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE},902);else browseRoots();}else if(i==2)browseFolder(wallpapers.library(),wallpapers.library());else{prefs.edit().putString("wallpaper_kind","builtin").apply();render();chooseWallpaper();}},this::showAppearance);}

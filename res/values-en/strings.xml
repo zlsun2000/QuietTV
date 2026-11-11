@@ -11,6 +11,9 @@
     <string name="control_home_unknown">Default home not confirmed</string>
     <string name="control_desktop_settings_hint">Appearance, apps, playback, weather and system</string>
     <string name="control_input_settings">Input settings</string>
+    <string name="control_refresh_inputs">Refresh inputs</string>
+    <string name="control_input_system">Open system input settings</string>
+    <string name="control_input_setup_hint">Refresh inputs reported by the TV. System input settings are available when the device provides them.</string>
     <string name="control_no_inputs">No available inputs detected</string>
     <string name="control_network_unavailable">No network settings screen is available</string>
     <string name="control_appearance_summary">Background and card appearance</string>
@@ -22,6 +25,7 @@
     <string name="control_system_summary">Default home and system shortcuts</string>
     <string name="control_layout_split">Favorites and playback in separate rows</string>
     <string name="control_layout_side">Favorites and playback side by side</string>
+    <string name="control_layout_hidden">Favorite apps are hidden</string>
     <string name="settings_home_layout">Home layout</string>
     <string name="home_layout_hint">Favorites and continue playing are side by side by default. With separate rows enabled, change their order under Apps &amp; categories → Manage categories.</string>
     <string name="home_split_rows">Separate rows</string>
