@@ -60,7 +60,7 @@ This feature has not been confirmed on a real Google TV device. It is separate f
 
 ## Backgrounds
 
-Open **桌面设置 → 背景与外观 → 自定义背景 → 从系统文件选择器导入** (Launcher settings → Background and appearance → Custom background → Import with system file picker).
+Open **控制中心 → 主页布局 → 背景与外观 → 自定义背景 → 从系统文件选择器导入** (Control center → Home layout → Background and appearance → Custom background → Import with system file picker).
 
 Try common image/video formats such as JPEG, PNG, and MP4. Images are limited to 50 MB and videos to 400 MB. Selected files are copied into QuietTV, so you can remove the USB drive afterward. For video backgrounds, start with a small 1080p MP4. If the TV cannot play it, QuietTV shows the included landscape instead.
 
@@ -70,8 +70,8 @@ If no system file picker is available, try **U 盘 / 旧系统文件浏览** (US
 
 For recognition through the media app's current playback session:
 
-1. Open **桌面设置 → 继续播放** (Launcher settings → Continue playing) and enable **显示播放记录** (Show playback history).
-2. Under **记录来源与权限** (Sources and permissions), enable **自动识别媒体播放** (Automatically recognize media playback). Open **媒体访问权限** (Media access) and follow Android's notification-access prompt.
+1. Open **控制中心 → 主页布局** (Control center → Home layout) and enable **显示继续播放** (Show Continue playing).
+2. In the control center, go to **设置 → 桌面设置 → 继续播放 → 记录来源与权限** (Settings → Launcher settings → Continue playing → Sources and permissions). Enable **自动识别媒体播放** (Automatically recognize media playback), then open **媒体访问权限** (Media access) and follow Android's notification-access prompt.
 3. Play something normally in the original app, then return to QuietTV. Use the app list in settings to exclude apps you do not want recorded.
 
 Android calls the permission “notification access.” QuietTV uses media-session information such as title, artwork, and progress; **it does not read notification text**. Basic launcher functionality works without this permission. Some TVs omit the permission entry or require **Allow restricted settings** in app information first.

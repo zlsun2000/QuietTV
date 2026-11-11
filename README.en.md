@@ -51,7 +51,7 @@ QuietTV uses **Watch Next**, app broadcasts, or **MediaSession** data, then hand
 | [SmartTube 32.56](docs/playback-rules/smarttube-32.56-session.json) | Position resume after closing the client on the same personal test setup | Pinned package, version, and certificate. Public APK not retested there; older SmartYouTube is not supported by this rule |
 | [TCL Bilibili variant](docs/playback-rules/bilibili-tcl.json) | Historical success with an earlier TV distribution | Current 1.7.7 adaptation has not succeeded; this is not general Bilibili support |
 
-In the Chinese UI, open **控制中心 → 桌面设置 → 继续播放 → 高级设置 → 应用适配规则 → 导入 JSON 规则** (Control center → Launcher settings → Continue playing → Advanced → App adaptation rules → Import JSON). Review the target version and notes, save, then enable the rule manually and play something normally in the original app. Enable the permissions required by that adapter.
+In the Chinese UI, open **控制中心 → 设置 → 桌面设置 → 继续播放 → 高级设置 → 应用适配规则 → 导入 JSON 规则** (Control center → Settings → Launcher settings → Continue playing → Advanced → App adaptation rules → Import JSON). Review the target version and notes, save, then enable the rule manually and play something normally in the original app. Enable the permissions required by that adapter.
 
 Opening an app, opening content, restoring an active session, and passing a playback position are different capabilities. **A progress bar or a valid configuration does not prove exact resume.** See [compatibility details (中文)](docs/COMPATIBILITY.md).
 
