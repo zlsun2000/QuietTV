@@ -134,9 +134,20 @@ public final class SettingsChecks extends Instrumentation {
         back();page(R.string.toolbar_home_settings,5,"layout Back from desktop settings");
         MainActivity previous=activity;
         ActivityMonitor recreated=addMonitor(MainActivity.class.getName(),null,false);
-        main(previous::recreate);
-        MainActivity next=(MainActivity)waitForMonitorWithTimeout(recreated,10000);
-        removeMonitor(recreated);
+        MainActivity next=null;
+        try {
+            main(previous::recreate);
+            // The monitor can report the old instance as it finishes resuming.
+            long deadline=SystemClock.uptimeMillis()+10000;
+            long remaining=deadline-SystemClock.uptimeMillis();
+            while(remaining>0) {
+                next=(MainActivity)recreated.waitForActivityWithTimeout(remaining);
+                if(next!=null&&next!=previous)break;
+                remaining=deadline-SystemClock.uptimeMillis();
+            }
+        } finally {
+            removeMonitor(recreated);
+        }
         if(next==null||next==previous)throw new AssertionError("No recreated launcher");
         activity=next;
         frames();
