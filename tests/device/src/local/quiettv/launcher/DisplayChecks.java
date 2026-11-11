@@ -26,22 +26,88 @@ public final class DisplayChecks extends Instrumentation {
     @SuppressWarnings("unchecked") private ArrayList<ArrayList<View>> focusRows(MainActivity a)throws Exception{return (ArrayList<ArrayList<View>>)field(a,"focusRows");}
     private int rowContaining(MainActivity a,String prefix)throws Exception{ArrayList<ArrayList<View>> graph=focusRows(a);for(int i=0;i<graph.size();i++)for(View v:graph.get(i))if(v.getTag()!=null&&v.getTag().toString().startsWith(prefix))return i;return -1;}
     private void choose(MainActivity a,int index)throws Exception{main(()->{Dialog dialog=(Dialog)field(a,"sheet");View choice=dialog.getWindow().getDecorView().findViewWithTag("settings-option:"+index);if(choice==null)throw new AssertionError("Missing settings choice "+index);choice.requestFocus();choice.performClick();});frames(a);}
-    private void homeLayout(MainActivity a,SharedPreferences home)throws Exception{
+    private void toggle(MainActivity a,String key)throws Exception{
+        main(()->{
+            Dialog dialog=(Dialog)field(a,"sheet");
+            View row=dialog.getWindow().getDecorView().findViewWithTag("control-action:"+key);
+            if(row==null)throw new AssertionError("Missing home layout action "+key);
+            row.requestFocus();
+            row.performClick();
+        });
+        frames(a);
+    }
+    private boolean hasHeading(MainActivity a,int label)throws Exception{
+        ArrayList<View> matches=new ArrayList<>();
+        ((View)field(a,"content")).findViewsWithText(matches,a.getString(label),View.FIND_VIEWS_WITH_TEXT);
+        return !matches.isEmpty();
+    }
+    private void homeLayout(MainActivity a,SharedPreferences home,SharedPreferences history)throws Exception{
         // Model an existing 0.14.x home store: no new keys and no recent group.
         // The app list and enabled synthetic playback record are the display fixture.
         main(()->{home.edit().remove("home_split_rows").remove("home_show_favorites").putString("groups","[{\"id\":\"favorites\",\"title\":\"Favorites\",\"row\":false},{\"id\":\"all\",\"title\":\"Synthetic grid\",\"row\":false}]").commit();a.loadGroups();a.render();});frames(a);
         main(()->{int favorite=rowContaining(a,"favorites|"),recent=rowContaining(a,"recent|");check(favorite>0&&favorite==recent,"legacy home defaults to the shared favorite/recent band");check(!home.contains("home_split_rows")&&!home.contains("home_show_favorites"),"legacy defaults need no migration or preference reset");});
-        main(a::showSettings);frames(a);choose(a,5);choose(a,0);
+        main(a::showSettings);frames(a);choose(a,5);toggle(a,"split");
         main(()->{int favorite=rowContaining(a,"favorites|"),recent=rowContaining(a,"recent|");check(home.getBoolean("home_split_rows",false),"split switch is saved");check(favorite>0&&recent>favorite,"split switch creates separate ordered rows");int favoriteCards=0;for(View v:focusRows(a).get(favorite))if(v.getTag()!=null&&v.getTag().toString().startsWith("favorites|"))favoriteCards++;check(favoriteCards==3,"split favorites is one horizontal row despite legacy grid preference");});
+        String records=history.getString("records","");
+        toggle(a,"playback");
+        main(()->{
+            check(!history.getBoolean("enabled",true),"playback switch saves the disabled state");
+            check(rowContaining(a,"recent|")==-1&&rowContaining(a,"empty|recent")==-1
+                    &&!hasHeading(a,R.string.heading_continue_playing),"disabled playback removes the whole split section");
+            check(!records.isEmpty()&&records.equals(history.getString("records","")),"turning off playback preserves stored records");
+        });
+        toggle(a,"playback");
+        main(()->check(rowContaining(a,"recent|")>0,"turning playback back on restores the saved card"));
         // Move recent past inputs and then favorites past both via the real category editor.
         main(a::showGroups);frames(a);choose(a,1);choose(a,1);main(a::showGroups);frames(a);choose(a,0);choose(a,2);choose(a,2);
         main(()->{int favorite=rowContaining(a,"favorites|"),recent=rowContaining(a,"recent|");check(recent>0&&favorite>recent,"category move controls reorder both independent rows");a.loadGroups();a.render();});frames(a);
         main(()->check(rowContaining(a,"recent|")>0&&rowContaining(a,"favorites|")>rowContaining(a,"recent|"),"group order survives reload from legacy-upgraded preferences"));
-        main(a::showHomeLayout);frames(a);choose(a,1);
+        main(()->a.showHomeLayout(null));frames(a);toggle(a,"favorites");
         main(()->{check(!home.getBoolean("home_show_favorites",true),"favorites visibility switch is saved");check(rowContaining(a,"favorites|")==-1&&rowContaining(a,"recent|")>0,"hidden favorites leave an independent recent row");});
-        choose(a,0);
+        toggle(a,"split");
         main(()->{check(!home.getBoolean("home_split_rows",true)&&!home.getBoolean("home_show_favorites",true),"both switch values survive reopening and toggling");check(rowContaining(a,"favorites|")==-1&&rowContaining(a,"recent|")>0,"hidden favorites leave recent independent in default layout");});
         main(()->{Dialog dialog=(Dialog)field(a,"sheet");if(dialog!=null)dialog.dismiss();home.edit().remove("home_split_rows").remove("home_show_favorites").commit();a.render();});frames(a);
+    }
+    @SuppressWarnings("unchecked")
+    private void inputVisibility(MainActivity a,SharedPreferences home)throws Exception{
+        InputSources.Port port=new InputSources.Port();
+        port.id=73;port.number=1;port.name="Fixture HDMI";port.enumName="ANDROID_HDMI";
+        port.intent=new Intent(Intent.ACTION_VIEW);
+        Method scan=MainActivity.class.getDeclaredMethod("applyInputScan",ArrayList.class);
+        scan.setAccessible(true);
+        main(()->{
+            home.edit().remove("home_show_inputs").commit();
+            ((Set<String>)field(a,"favorites")).add(port.key());
+            scan.invoke(a,new ArrayList<>(Collections.singletonList(port)));
+            a.showHomeLayout(null);
+        });frames(a);
+        main(()->{
+            View root=(View)field(a,"root");
+            check(root.findViewWithTag("inputs|"+port.key())!=null,"legacy home shows an available input by default");
+            check(root.findViewWithTag("favorites|"+port.key())!=null,"an input can also be saved to favorites");
+        });
+        toggle(a,"inputs");
+        main(()->{
+            View root=(View)field(a,"root");
+            check(!home.getBoolean("home_show_inputs",true),"input visibility saves the disabled state");
+            check(rowContaining(a,"inputs|")==-1&&!hasHeading(a,R.string.group_inputs)
+                    &&root.findViewWithTag("favorites|"+port.key())==null,"hiding inputs removes the row and its shortcuts from home");
+            Dialog dialog=(Dialog)field(a,"sheet");
+            View decor=dialog.getWindow().getDecorView();
+            decor.findViewWithTag("control-tab:INPUTS").requestFocus();
+            check(decor.findViewWithTag("control-action:"+port.key())!=null,"hidden home inputs are still selectable in the control center");
+            decor.findViewWithTag("control-tab:HOME").requestFocus();
+        });
+        toggle(a,"inputs");
+        main(()->{
+            View root=(View)field(a,"root");
+            check(root.findViewWithTag("inputs|"+port.key())!=null
+                    &&root.findViewWithTag("favorites|"+port.key())!=null,"showing inputs restores the row and the saved favorite");
+            ((Dialog)field(a,"sheet")).dismiss();
+            ((Set<String>)field(a,"favorites")).remove(port.key());
+            home.edit().remove("home_show_inputs").commit();
+            scan.invoke(a,new ArrayList<InputSources.Port>());
+        });frames(a);
     }
     private void recentPresentation(MainActivity a)throws Exception{
         main(()->{
@@ -54,7 +120,12 @@ public final class DisplayChecks extends Instrumentation {
     }
     private void emptyAndOrganize(MainActivity a,SharedPreferences home,SharedPreferences history)throws Exception{
         main(()->{home.edit().putBoolean("home_split_rows",true).putBoolean("home_show_favorites",true).putString("groups","[{\"id\":\"favorites\",\"title\":\"Favorites\",\"row\":true},{\"id\":\"all\",\"title\":\"Synthetic grid\",\"row\":false}]").commit();history.edit().putBoolean("enabled",false).putBoolean("generic_enabled",false).remove("records").commit();set(a,"favorites",new HashSet<String>());a.loadGroups();a.render();});frames(a);
-        main(()->{View root=(View)field(a,"root"),favorites=root.findViewWithTag("empty|favorites"),recent=root.findViewWithTag("empty|recent");check(favorites!=null&&recent!=null&&favorites.isFocusable()&&recent.isFocusable(),"empty favorites and history provide reachable actions");check(((android.widget.TextView)recent).getText().toString().equals(a.getString(R.string.empty_recent_off)),"disabled history is explained without implying a permission failure");favorites.requestFocus();});frames(a);sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);frames(a);
+        main(()->{
+            check(rowContaining(a,"empty|recent")==-1&&!hasHeading(a,R.string.heading_continue_playing),
+                    "disabled playback with no records has no placeholder");
+            history.edit().putBoolean("enabled",true).commit();a.render();
+        });frames(a);
+        main(()->{View root=(View)field(a,"root"),favorites=root.findViewWithTag("empty|favorites"),recent=root.findViewWithTag("empty|recent");check(favorites!=null&&recent!=null&&favorites.isFocusable()&&recent.isFocusable(),"empty favorites and enabled history provide reachable actions");favorites.requestFocus();});frames(a);sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);frames(a);
         main(()->{check("empty|recent".equals(a.getCurrentFocus().getTag()),"remote moves from empty favorites to empty history");a.getCurrentFocus().performClick();});frames(a);
         main(()->{Dialog dialog=(Dialog)field(a,"sheet");check(dialog!=null&&dialog.isShowing(),"empty history opens playback settings");if(dialog!=null)dialog.dismiss();history.edit().putBoolean("enabled",true).putBoolean("generic_enabled",false).commit();a.render();});frames(a);
         main(()->{android.widget.TextView recent=((View)field(a,"root")).findViewWithTag("empty|recent");check(recent!=null&&recent.getText().toString().equals(a.getString(R.string.empty_recent_detection_off)),"disabled media detection has a distinct empty explanation");history.edit().putBoolean("generic_enabled",true).commit();a.render();});frames(a);
@@ -120,7 +191,8 @@ public final class DisplayChecks extends Instrumentation {
             for(int step=0;step<4;step++){sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP);frames(a);capacity(a,"scenario "+scenario+" up "+step);}
         }
         if(focusRefreshOnly){result.putString(failures.isEmpty()?"passed":"failed",count+" focus refresh checks; failures="+failures.toString());finish(failures.isEmpty()?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);return;}
-        homeLayout(a,home);
+        homeLayout(a,home,history);
+        inputVisibility(a,home);
         recentPresentation(a);
         emptyAndOrganize(a,home,history);
         Wallpapers wallpaper=(Wallpapers)field(a,"wallpapers");File video=SyntheticVideo.create(new File(c.getCacheDir(),"synthetic-wallpaper.mp4"));CountDownLatch imported=new CountDownLatch(1);final boolean[] ok={false};wallpaper.importFile(video,(success,isVideo)->{ok[0]=success&&isVideo;imported.countDown();});check(imported.await(10,TimeUnit.SECONDS)&&ok[0],"synthetic silent video imports");main(a::render);
