@@ -70,6 +70,15 @@ public final class DisplayChecks extends Instrumentation {
     }
     @SuppressWarnings("unchecked")
     private void inputVisibility(MainActivity a,SharedPreferences home)throws Exception{
+        // Keep the synthetic HDMI port authoritative for the rest of this emulator test.
+        InputSources scanner=(InputSources)field(a,"inputSources");
+        if(scanner!=null){
+            main(()->{set(a,"inputSources",null);scanner.dispose();});
+            ExecutorService worker=(ExecutorService)field(scanner,"worker");
+            if(!worker.awaitTermination(10,TimeUnit.SECONDS))
+                throw new AssertionError("Input discovery did not stop before installing the fixture");
+            waitForIdleSync();
+        }
         InputSources.Port port=new InputSources.Port();
         port.id=73;port.number=1;port.name="Fixture HDMI";port.enumName="ANDROID_HDMI";
         port.intent=new Intent(Intent.ACTION_VIEW);
