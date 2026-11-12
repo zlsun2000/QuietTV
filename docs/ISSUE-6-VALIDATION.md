@@ -50,3 +50,10 @@
 - 清理数据后：普通最终版完整显示 249 项通过；仅在本地副本强制 `isLowRamDevice()` 返回 true 的完整显示 249 项通过；该低内存副本的移动专项 33 项、上下切换专项 8 项（含低内存退路断言）通过。独立日志为 `emulator-local/emulator-5574/issue6-recheck-normal-display.txt`、`issue6-recheck-lowram-display.txt`、`issue6-recheck-lowram-moveonly.txt`、`issue6-recheck-lowram-transitiononly.txt`。
 - 三项失败在清理数据后均未复现，指向先前合成升级、壁纸和规则检查留下的测试应用偏好状态，而非本版三项改动的产品缺陷。本次未做单变量注入复现，不把具体残留字段写成已证实结论；显示套件应在清理测试应用数据后运行。产品源码未因本次排查修改，排序、焦点、壁纸和低内存退路保持原有行为。
 - 以上仍只是隔离模拟器结果，不能称为 Streamer、TCL Android 9 或真实低内存设备通过。
+
+## CI 兼容作业与发布状态（2026-11-12）
+
+- 推送 `301414f` 后的 [CI run 43217412166](https://github.com/zlsun2000/QuietTV/actions/runs/43217412166)：`android (28)`、`android (30)` 成功；`android (23)` 的 `fresh` 30 项、`upgrade` 12 项、`rules` 71 项通过，但 `display` 在 `hidden favorites leave recent independent in default layout` 之后不再产生输出，600 秒后被 `timeout` 终止（exit 124）。设备日志未见本应用崩溃或 ANR。
+- 对失败作业发起一次重跑（attempt 2），在**同一检查之后**再次无输出并超时；不是偶发抖动，也不能归因于某项断言失败。API 28、API 30 与本地 API 34 的显示检查均通过。
+- `DisplayChecks.inputVisibility()` 开头会关闭并等待合成 HDMI 输入源扫描线程（`InputSources.dispose()`、`worker.awaitTermination`、`waitForIdleSync()`），随后才安装输入源夹具。挂起位置紧接该入口，需在 API 23 环境单独复现；目前没有证据断定是产品代码缺陷、测试夹具还是模拟器运行时问题，因此不改动产品源码、不跳过或放宽该检查。
+- 按「任何必要验证失败不发布」的约定：**未创建 v1.0.1 tag，未创建 draft/正式 Release，未回复 Issue #6**。源码、版本说明、验证记录与测试夹具已推送到 `origin/main`；正式密钥构建的 APK 与校验文件只在本地 `release/v1.0.1/`，未上传。待 API 23 挂起查清、CI 全绿后再核对构建证据并发布。
