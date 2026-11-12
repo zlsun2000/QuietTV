@@ -77,7 +77,10 @@ public final class DisplayChecks extends Instrumentation {
             ExecutorService worker=(ExecutorService)field(scanner,"worker");
             if(!worker.awaitTermination(10,TimeUnit.SECONDS))
                 throw new AssertionError("Input discovery did not stop before installing the fixture");
-            waitForIdleSync();
+            // The desktop keeps a continuous background animation, so the global
+            // message queue may never become idle on older TV runtimes. Wait for
+            // real frames instead; already-posted scan callbacks run before them.
+            frames(a);
         }
         InputSources.Port port=new InputSources.Port();
         port.id=73;port.number=1;port.name="Fixture HDMI";port.enumName="ANDROID_HDMI";
