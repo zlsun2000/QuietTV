@@ -11,9 +11,9 @@ import java.util.concurrent.*;
 
 /** Regression scenarios on a disposable emulator only; no accounts, apps or user media. */
 public final class DisplayChecks extends Instrumentation {
-    private boolean focusRefreshOnly;
+    private boolean focusRefreshOnly,moveOnly;
     private int count;private final ArrayList<String> failures=new ArrayList<>();
-    @Override public void onCreate(Bundle args){super.onCreate(args);focusRefreshOnly=args!=null&&"true".equals(args.getString("focusRefreshOnly"));start();}
+    @Override public void onCreate(Bundle args){super.onCreate(args);focusRefreshOnly=args!=null&&"true".equals(args.getString("focusRefreshOnly"));moveOnly=args!=null&&"true".equals(args.getString("issue6MoveOnly"));start();}
     interface Work {void run()throws Exception;}
     private void main(Work work){final Throwable[] failure={null};runOnMainSync(()->{try{work.run();}catch(Throwable e){failure[0]=e;}});if(failure[0]!=null)throw new RuntimeException(failure[0]);}
     private Object field(Object owner,String name)throws Exception {Field f=owner.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(owner);}
@@ -146,6 +146,42 @@ public final class DisplayChecks extends Instrumentation {
         main(()->a.getCurrentFocus().performLongClick());frames(a);choose(a,3);
         main(()->{check(a.getCurrentFocus()!=null&&"favorites|local.quiettv.synthetic.app2".equals(a.getCurrentFocus().getTag()),"hiding an item keeps focus on the next visible item");home.edit().remove("home_split_rows").remove("home_show_favorites").commit();a.render();});frames(a);
     }
+    private void moveCase(MainActivity a,SharedPreferences home,SharedPreferences history,String group,boolean split,boolean grid)throws Exception{
+        final String prefix="local.quiettv.synthetic.app",key=group+"|"+prefix+"0";
+        main(()->{
+            home.edit().putBoolean("home_split_rows",split).putBoolean("home_show_favorites",true)
+                    .remove("order_"+group).putString("groups","[{\"id\":\"favorites\",\"title\":\"Favorites\",\"row\":false},{\"id\":\"all\",\"title\":\"Synthetic grid\",\"row\":false}]").commit();
+            history.edit().putBoolean("enabled",true).putBoolean("generic_enabled",true).remove("records").commit();
+            PlaybackRecord record=new PlaybackRecord();record.source="local.quiettv.checks";record.sourceLabel="Fixture";record.command="media/session";record.videoId=MediaRecordPolicy.digest("move-check");record.title="Synthetic display record";record.updated=System.currentTimeMillis();new HistoryStore(a).put(record);
+            set(a,"hidden",new HashSet<String>());set(a,"favorites",new HashSet<>(Arrays.asList(prefix+"0",prefix+"1",prefix+"2")));
+            Properties properties=new Properties();properties.setProperty("grid.columns","5");set(a,"ui",new UiConfig(properties));a.loadGroups();a.render();
+        });frames(a);
+        final Object[] page={null};
+        main(()->{page[0]=field(a,"desktopPage");View tile=((View)field(a,"root")).findViewWithTag(key);if(tile==null)throw new AssertionError("Missing "+key);tile.requestFocus();tile.performLongClick();});frames(a);choose(a,2);
+        main(()->{
+            check(page[0]==field(a,"desktopPage"),group+" "+split+" enters move mode without replacing the desktop");
+            a.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_LEFT));
+            check(!home.contains("order_"+group),group+" "+split+" ignores movement beyond the first item");
+            a.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,grid?KeyEvent.KEYCODE_DPAD_DOWN:KeyEvent.KEYCODE_DPAD_RIGHT));
+            check(page[0]==field(a,"desktopPage"),group+" "+split+" moves without replacing the desktop");
+            check(a.getCurrentFocus()!=null&&key.equals(a.getCurrentFocus().getTag()),group+" "+split+" keeps focus on the moved app");
+            ArrayList<String> order=a.readOrder(group);int destination=grid?5:1;
+            check(order.size()>destination&&order.get(destination).equals(prefix+"0")&&order.get(0).equals(prefix+destination),group+" "+split+" persists the same swap order");
+        });frames(a);
+        main(()->{
+            if(grid)a.onBackPressed();else a.getCurrentFocus().performClick();
+            check(page[0]==field(a,"desktopPage"),group+" "+split+" finishes moving without replacing the desktop");
+            check(a.getCurrentFocus()!=null&&key.equals(a.getCurrentFocus().getTag()),group+" "+split+" retains focus after finishing");
+            a.getCurrentFocus().performLongClick();
+        });frames(a);
+        main(()->{Dialog dialog=(Dialog)field(a,"sheet");android.widget.TextView title=dialog==null?null:dialog.getWindow().getDecorView().findViewWithTag("settings-title");check(title!=null&&"App 00".contentEquals(title.getText()),group+" "+split+" opens the moved app's own menu");if(dialog!=null)dialog.dismiss();a.render();});frames(a);
+        main(()->{View tile=((View)field(a,"root")).findViewWithTag(key);check(tile!=null&&tile.getParent() instanceof MainActivity.CardRow&&((MainActivity.CardRow)tile.getParent()).indexOfChild(tile)==(grid?0:1),group+" "+split+" restores the moved order after rendering");});
+    }
+    private void moveCases(MainActivity a,SharedPreferences home,SharedPreferences history)throws Exception{
+        moveCase(a,home,history,"favorites",false,false);
+        moveCase(a,home,history,"favorites",true,false);
+        moveCase(a,home,history,"all",true,true);
+    }
     private void capacity(MainActivity a,String label)throws Exception {
         main(()->{if(((ArrayList<?>)field(a,"apps")).size()!=42)throw new AssertionError("Synthetic layout fixture was replaced during "+label);});
         final int[] actual={0},expected={0};final boolean[] focused={false};main(()->{View focus=a.getCurrentFocus();actual[0]=visible(a);if(focus==null||!(focus.getParent() instanceof MainActivity.CardRow))return;MainActivity.CardRow row=(MainActivity.CardRow)focus.getParent();focused[0]=row.fullyVisible();android.graphics.Rect bounds=row.cardBounds();MainActivity.CardScroll scroll=(MainActivity.CardScroll)field(a,"scroll");View content=(View)field(a,"content");HashSet<android.graphics.Rect> bands=new HashSet<>();for(MainActivity.CardRow r:rows(a))bands.add(r.cardBounds());for(int y=Math.max(0,bounds.bottom-scroll.getHeight());y<=Math.min(bounds.top,content.getHeight()-scroll.getHeight());y++){int n=0;for(android.graphics.Rect r:bands)if(r.top>=y&&r.bottom<=y+scroll.getHeight())n++;expected[0]=Math.max(expected[0],n);}});
@@ -170,13 +206,14 @@ public final class DisplayChecks extends Instrumentation {
         long scanDeadline=SystemClock.uptimeMillis()+10000;boolean settled=false;
         while(SystemClock.uptimeMillis()<scanDeadline){final boolean[] ready={false};main(()->ready[0]=!(Boolean)field(a,"appsLoading")&&!(Boolean)field(a,"appsDirty"));if(ready[0]){settled=true;break;}frames(a);}
         if(!settled)throw new AssertionError("Initial app discovery did not finish");
-        for(int scenario:focusRefreshOnly?new int[]{5}:new int[]{5,6,15,16,25,26}){final int columns=scenario%10;
+        for(int scenario:moveOnly?new int[]{25}:focusRefreshOnly?new int[]{5}:new int[]{5,6,15,16,25,26}){final int columns=scenario%10;
             main(()->{
                 Dialog sheet=(Dialog)field(a,"sheet");if(sheet!=null)sheet.dismiss();ArrayList list=(ArrayList)field(a,"apps");Object template=list.get(0);Class<?> type=template.getClass();Constructor<?> constructor=type.getDeclaredConstructor();constructor.setAccessible(true);list.clear();
                 for(int i=0;i<42;i++){Object item=constructor.newInstance();for(String name:new String[]{"intent","icon","banner","color"})set(item,name,field(template,name));set(item,"pkg","local.quiettv.synthetic.app"+i);set(item,"name",String.format(Locale.US,"App %02d",i));list.add(item);}
                 home.edit().putString("groups",scenario>=10?"[{\"id\":\"favorites\",\"title\":\"Favorites\",\"row\":true},{\"id\":\"all\",\"title\":\"Synthetic grid\",\"row\":false}]":"[{\"id\":\"all\",\"title\":\"Synthetic grid\",\"row\":false}]").commit();set(a,"favorites",new HashSet<>(Arrays.asList("local.quiettv.synthetic.app0","local.quiettv.synthetic.app1","local.quiettv.synthetic.app2")));history.edit().putBoolean("enabled",scenario>=20).putBoolean("generic_enabled",true).remove("records").commit();if(scenario>=20){PlaybackRecord r=new PlaybackRecord();r.source="local.quiettv.checks";r.sourceLabel="Fixture";r.command="media/session";r.videoId=MediaRecordPolicy.digest("display");r.title="Synthetic display record";r.updated=System.currentTimeMillis();new HistoryStore(c).put(r);}
                 Properties properties=new Properties();properties.setProperty("grid.columns",String.valueOf(columns));set(a,"ui",new UiConfig(properties));a.loadGroups();a.render();
             });frames(a);
+            if(moveOnly){moveCases(a,home,history);result.putString(failures.isEmpty()?"passed":"failed",count+" move checks; failures="+failures.toString());finish(failures.isEmpty()?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);return;}
             final int[] initial={0};main(()->initial[0]=visible(a));check(initial[0]>=1,"scenario "+scenario+" starts with complete rows");
             // Delayed package events rebuild the desktop while a remote target is
             // below the initial viewport. Restore visibility after actual layout.
@@ -204,6 +241,7 @@ public final class DisplayChecks extends Instrumentation {
         inputVisibility(a,home);
         recentPresentation(a);
         emptyAndOrganize(a,home,history);
+        moveCases(a,home,history);
         Wallpapers wallpaper=(Wallpapers)field(a,"wallpapers");File video=SyntheticVideo.create(new File(c.getCacheDir(),"synthetic-wallpaper.mp4"));CountDownLatch imported=new CountDownLatch(1);final boolean[] ok={false};wallpaper.importFile(video,(success,isVideo)->{ok[0]=success&&isVideo;imported.countDown();});check(imported.await(10,TimeUnit.SECONDS)&&ok[0],"synthetic silent video imports");main(a::render);
         long deadline=SystemClock.uptimeMillis()+10000;while(SystemClock.uptimeMillis()<deadline){frames(a);final boolean[] ready={false};main(()->ready[0]=wallpaper.videoCapability().isAvailable());if(ready[0])break;}
         final Object[] original=new Object[4];final long[] before={0};main(()->{original[0]=field(wallpaper,"layer");original[1]=field(wallpaper,"texture");original[2]=field(wallpaper,"surface");original[3]=field(wallpaper,"player");before[0]=(Long)field(wallpaper,"videoFrames");});check(original[3]!=null&&before[0]>0,"video decoder produces actual frames");

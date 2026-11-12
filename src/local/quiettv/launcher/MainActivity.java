@@ -504,8 +504,8 @@ public class MainActivity extends Activity {
         row.addView(button,new LinearLayout.LayoutParams(-2,dp(72)));content.addView(row);ArrayList<View> focuses=new ArrayList<>();focuses.add(button);focusRows.add(focuses);content.addView(new View(this),new LinearLayout.LayoutParams(1,dp(6)));
     }
     Tile makeTile(final App a,final Group group){
-        final Tile t=new Tile(this,a,group);t.setTag(group.id+"|"+a.pkg);t.setId(View.generateViewId());t.setOnClickListener(new View.OnClickListener(){public void onClick(View v){if(!moving.isEmpty()){moving="";render();return;}if(manage){if(hidden.contains(a.pkg))hidden.remove(a.pkg);else hidden.add(a.pkg);save();t.setContentDescription(a.name+(hidden.contains(a.pkg)?"，已隐藏":"，已显示"));t.invalidate();hint.setText(a.name+(hidden.contains(a.pkg)?" 已隐藏":" 已显示"));}else openApp(a);}});
-        t.setOnLongClickListener(new View.OnLongClickListener(){public boolean onLongClick(View v){selected=(String)t.getTag();showAppMenu(a,group);return true;}});return t;
+        final Tile t=new Tile(this,a,group);t.setId(View.generateViewId());t.setOnClickListener(new View.OnClickListener(){public void onClick(View v){if(!moving.isEmpty()){finishMoving();return;}App current=t.app;if(manage){if(hidden.contains(current.pkg))hidden.remove(current.pkg);else hidden.add(current.pkg);save();t.setContentDescription(current.name+(hidden.contains(current.pkg)?"，已隐藏":"，已显示"));t.invalidate();hint.setText(current.name+(hidden.contains(current.pkg)?" 已隐藏":" 已显示"));}else openApp(current);}});
+        t.setOnLongClickListener(new View.OnLongClickListener(){public boolean onLongClick(View v){selected=(String)t.getTag();showAppMenu(t.app,t.group);return true;}});return t;
     }
     Tool tool(String label, String tag, UiIcon.Glyph glyph, Runnable action) {
         Tool button = new Tool(this, label, glyph);
@@ -633,7 +633,33 @@ public class MainActivity extends Activity {
             for(int r=0;r<focusRows.size();r++){ArrayList<View> row=focusRows.get(r);int i=row.indexOf(focused);if(i<0)continue;int nr=r,ni=i;if(code==21)ni--;else if(code==22)ni++;else if(code==19)nr--;else nr++;if(nr>=0&&nr<focusRows.size()){ArrayList<View> next=focusRows.get(nr);if(nr!=r)ni=Math.min(ni,next.size()-1);if(ni>=0&&ni<next.size())next.get(ni).requestFocus();}return true;}
         }return super.dispatchKeyEvent(e);
     }
-    void moveApp(Tile tile,int code){ArrayList<App> list=manage?groupApps(tile.group,true):homeApps(tile.group);int index=-1;for(int i=0;i<list.size();i++)if(list.get(i).pkg.equals(tile.app.pkg))index=i;boolean horizontal=tile.group.row||(!manage&&tile.group.id.equals("favorites")&&prefs.getBoolean("home_split_rows",false));int step=code==21?-1:code==22?1:horizontal?0:code==19?-gridColumns:gridColumns;int next=index+step;if(index>=0&&step!=0&&next>=0&&next<list.size()){Collections.swap(list,index,next);saveOrder(tile.group,list);render();}}
+    private void beginMoving(App app,Group group){
+        moving=group.id+"|"+app.pkg;selected=moving;
+        View target=root==null?null:root.findViewWithTag(moving);
+        if(target==null){render();return;}
+        target.invalidate();target.requestFocus();
+        if(hint!=null)hint.setText(R.string.remote_move_hint);
+    }
+    private void finishMoving(){
+        String previous=moving;moving="";
+        View target=root==null?null:root.findViewWithTag(previous);
+        if(target!=null)target.invalidate();
+        if(hint!=null)hint.setText(manage?R.string.remote_organize_hint:R.string.remote_navigation_hint);
+    }
+    void moveApp(Tile tile,int code){
+        ArrayList<App> list=manage?groupApps(tile.group,true):homeApps(tile.group);int index=-1;
+        for(int i=0;i<list.size();i++)if(list.get(i).pkg.equals(tile.app.pkg))index=i;
+        boolean horizontal=tile.group.row||(!manage&&tile.group.id.equals("favorites")&&prefs.getBoolean("home_split_rows",false));
+        int step=code==21?-1:code==22?1:horizontal?0:code==19?-gridColumns:gridColumns;int next=index+step;
+        if(index<0||step==0||next<0||next>=list.size())return;
+        App movingApp=tile.app,otherApp=list.get(next);
+        View target=root==null?null:root.findViewWithTag(tile.group.id+"|"+otherApp.pkg);
+        Collections.swap(list,index,next);saveOrder(tile.group,list);
+        if(!(target instanceof Tile)||target==tile){render();return;}
+        // Keep the desktop and its wallpaper attached; only the two changed slots need repainting.
+        tile.bind(otherApp);Tile destination=(Tile)target;destination.bind(movingApp);
+        if(!destination.requestFocus())render();
+    }
     void fitLine(TextView view,String value,int size,int width){
         view.setSingleLine(true);view.setEllipsize(TextUtils.TruncateAt.END);view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,sp(size));view.setText(value);
         float available=Math.max(1,dp(width));
@@ -941,7 +967,7 @@ public class MainActivity extends Activity {
     void editName(final Group group){final EditText input=new EditText(this);input.setSingleLine(true);input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,sp(18));input.setText(group==null?"":group.title);input.setHint("分类名称");input.setPaddingRelative(dp(16),dp(10),dp(16),dp(10));new AlertDialog.Builder(this).setTitle(group==null?"新分类":"分类名称").setView(input).setPositiveButton("保存",new DialogInterface.OnClickListener(){public void onClick(DialogInterface d,int which){String name=input.getText().toString().trim();if(name.isEmpty())return;if(group==null)createGroup(name);else{group.title=name;saveGroups();render();editGroup(group);}}}).setNegativeButton("取消",(d,n)->{if(group==null)showGroups();else editGroup(group);}).setOnCancelListener(d->{if(group==null)showGroups();else editGroup(group);}).show();}
     void editGroup(final Group g){if(g.id.equals("favorites")&&prefs.getBoolean("home_split_rows",false)){settingsPanel("group-favorites",g.title,getString(R.string.favorite_order_hint),new String[]{"重命名","分类上移","分类下移"},i->{if(i==0){editName(g);return;}int at=groups.indexOf(g),next=at+(i==1?-1:1);if(next>=0&&next<groups.size())Collections.swap(groups,at,next);saveGroups();render();editGroup(g);},this::showGroups);return;}if(g.id.equals("recent")){settingsPanel("group-recent",g.title,getString(R.string.recent_order_hint),new String[]{"分类上移","分类下移"},i->{int at=groups.indexOf(g),next=at+(i==0?-1:1);if(next>=0&&next<groups.size())Collections.swap(groups,at,next);saveGroups();render();editGroup(g);},this::showGroups);return;}ArrayList<String> options=new ArrayList<>(Arrays.asList("重命名",g.row?"改为网格":"改为横向一排","分类上移","分类下移"));if(!g.id.equals("favorites")&&!g.id.equals("all")&&!g.id.equals("inputs"))options.add("删除此分类");settingsPanel("group-"+g.id,g.title,getString(R.string.category_hint),options.toArray(new String[0]),i->{if(i==0){editName(g);return;}if(i==1)g.row=!g.row;if(i==2||i==3){int at=groups.indexOf(g),next=at+(i==2?-1:1);if(next>=0&&next<groups.size())Collections.swap(groups,at,next);}if(i==4)groups.remove(g);saveGroups();render();if(i==4)showGroups();else editGroup(g);},this::showGroups);}
     void selectNeighborAfterRemoval(App app,Group group){ArrayList<App> items=homeApps(group);int index=-1;for(int i=0;i<items.size();i++)if(items.get(i).pkg.equals(app.pkg)){index=i;break;}selected=group.id.equals("favorites")?"empty|favorites":"";if(index>=0){int neighbor=index+1<items.size()?index+1:index-1;if(neighbor>=0)selected=group.id+"|"+items.get(neighbor).pkg;}}
-    void showAppMenu(final App a,final Group g){String details=(a.port==null?"应用操作":inputStatus(a.port))+"\n"+getString(R.string.organize_move_hint);panel(a.name,details,new String[]{a.port==null?"打开应用":"进入输入源",favorites.contains(a.pkg)?"从常用移除":"添加到常用","移动位置",hidden.contains(a.pkg)?"显示在主页":"从主页隐藏","添加 / 移出分类",a.port==null?"应用信息":"刷新接入状态"},new Choice(){public void pick(int i){if(i==0){openApp(a);return;}if(i==1){boolean removed=favorites.contains(a.pkg);if(removed&&g.id.equals("favorites"))selectNeighborAfterRemoval(a,g);if(removed)favorites.remove(a.pkg);else favorites.add(a.pkg);save();render();Toast.makeText(MainActivity.this,removed?R.string.organize_favorite_removed:R.string.organize_favorite_added,Toast.LENGTH_SHORT).show();}else if(i==2){moving=g.id+"|"+a.pkg;selected=moving;render();}else if(i==3){boolean hide=!hidden.contains(a.pkg);if(hide&&!manage)selectNeighborAfterRemoval(a,g);if(hide)hidden.add(a.pkg);else hidden.remove(a.pkg);save();render();Toast.makeText(MainActivity.this,hide?R.string.organize_hidden:R.string.organize_shown,Toast.LENGTH_SHORT).show();}else if(i==4)chooseMembership(a);else if(i==5){if(a.port==null){Intent info=SystemEntrypoints.appInfo(MainActivity.this,a.pkg);if(info==null)Toast.makeText(MainActivity.this,"系统未提供应用信息入口",Toast.LENGTH_LONG).show();else launch(info,"应用信息");}else refreshInputs();}}});}
+    void showAppMenu(final App a,final Group g){String details=(a.port==null?"应用操作":inputStatus(a.port))+"\n"+getString(R.string.organize_move_hint);panel(a.name,details,new String[]{a.port==null?"打开应用":"进入输入源",favorites.contains(a.pkg)?"从常用移除":"添加到常用","移动位置",hidden.contains(a.pkg)?"显示在主页":"从主页隐藏","添加 / 移出分类",a.port==null?"应用信息":"刷新接入状态"},new Choice(){public void pick(int i){if(i==0){openApp(a);return;}if(i==1){boolean removed=favorites.contains(a.pkg);if(removed&&g.id.equals("favorites"))selectNeighborAfterRemoval(a,g);if(removed)favorites.remove(a.pkg);else favorites.add(a.pkg);save();render();Toast.makeText(MainActivity.this,removed?R.string.organize_favorite_removed:R.string.organize_favorite_added,Toast.LENGTH_SHORT).show();}else if(i==2){beginMoving(a,g);}else if(i==3){boolean hide=!hidden.contains(a.pkg);if(hide&&!manage)selectNeighborAfterRemoval(a,g);if(hide)hidden.add(a.pkg);else hidden.remove(a.pkg);save();render();Toast.makeText(MainActivity.this,hide?R.string.organize_hidden:R.string.organize_shown,Toast.LENGTH_SHORT).show();}else if(i==4)chooseMembership(a);else if(i==5){if(a.port==null){Intent info=SystemEntrypoints.appInfo(MainActivity.this,a.pkg);if(info==null)Toast.makeText(MainActivity.this,"系统未提供应用信息入口",Toast.LENGTH_LONG).show();else launch(info,"应用信息");}else refreshInputs();}}});}
     void chooseMembership(final App a){final ArrayList<Group> custom=new ArrayList<>();ArrayList<String> choices=new ArrayList<>();for(Group g:groups)if(!g.id.equals("favorites")&&!g.id.equals("all")&&!g.id.equals("inputs")&&!g.id.equals("recent")){custom.add(g);boolean member=prefs.getStringSet("members_"+g.id,Collections.<String>emptySet()).contains(a.pkg);choices.add((member?"移出 · ":"添加到 · ")+g.title);}if(custom.isEmpty()){addGroup();return;}panel("应用分类",a.name,choices.toArray(new String[0]),new Choice(){public void pick(int i){Group g=custom.get(i);Set<String> m=new HashSet<>(prefs.getStringSet("members_"+g.id,Collections.<String>emptySet()));if(m.contains(a.pkg))m.remove(a.pkg);else m.add(a.pkg);prefs.edit().putStringSet("members_"+g.id,m).apply();render();}});}
     void openApp(App app){
         if(app.port==null||app.port.children.size()<2){launch(app.intent,app.name);return;}
@@ -981,24 +1007,29 @@ public class MainActivity extends Activity {
     }
     String capabilityLine(String label,DeviceCapability capability){String state=capability.state==DeviceCapability.State.AVAILABLE?getString(R.string.capability_available):capability.state==DeviceCapability.State.OPTIONAL?getString(R.string.capability_optional):capability.state==DeviceCapability.State.WAITING?getString(R.string.capability_waiting):capability.state==DeviceCapability.State.UNSUPPORTED?getString(R.string.capability_unsupported):getString(R.string.capability_inactive);return label+"："+state+" · "+capability.reason;}
     void openOriginal(){final ArrayList<ResolveInfo> homes=SystemEntrypoints.otherHomes(this);if(homes.isEmpty()){panel("其他桌面","没有检测到可打开的其他桌面。请通过系统默认应用设置恢复；不要停用或卸载原桌面。",new String[]{"打开电视设置","返回"},i->{if(i==0)openSettings();});return;}String[] labels=new String[homes.size()];for(int n=0;n<labels.length;n++)labels[n]=homes.get(n).loadLabel(getPackageManager()).toString();Choice open=n->{ResolveInfo r=homes.get(n);launch(SystemEntrypoints.homeQuery().setComponent(new ComponentName(r.activityInfo.packageName,r.activityInfo.name)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),labels[n]);};if(homes.size()==1)open.pick(0);else panel("打开其他桌面","这次打开不改变默认桌面；长期恢复请到系统默认应用设置选择",labels,open);}
-    @Override public void onBackPressed(){if(prefs==null)return;if(!moving.isEmpty()){moving="";render();return;}if(manage){manage=false;selected="";render();if(settingsOpen)showAppSettings();return;}panel("返回原厂桌面？","新桌面的设置会自动保存",new String[]{"留在新桌面","返回原厂桌面"},new Choice(){public void pick(int i){if(i==1)openOriginal();}});}
+    @Override public void onBackPressed(){if(prefs==null)return;if(!moving.isEmpty()){finishMoving();return;}if(manage){manage=false;selected="";render();if(settingsOpen)showAppSettings();return;}panel("返回原厂桌面？","新桌面的设置会自动保存",new String[]{"留在新桌面","返回原厂桌面"},new Choice(){public void pick(int i){if(i==1)openOriginal();}});}
 
     class Tile extends View {
-        final App app;final Group group;final Paint p=new Paint(3);final RectF r=new RectF();final Path clip=new Path();
-        final UiIcon inputIcon;
-        final UiIcon hiddenIcon;
+        App app;final Group group;final Paint p=new Paint(3);final RectF r=new RectF();final Path clip=new Path();
+        UiIcon inputIcon;
+        UiIcon hiddenIcon;
         Tile(Context context, App app, Group group) {
             super(context);
-            this.app = app;
             this.group = group;
+            setFocusableInTouchMode(true);
+            setClickable(true);
+            bind(app);
+            setOnFocusChangeListener((v, focused) -> focusChanged(v, focused));
+        }
+        void bind(App app) {
+            this.app = app;
+            setTag(group.id+"|"+app.pkg);
             inputIcon = app.port == null ? null : new UiIcon(sourceGlyph(app.port), dp(26), WHITE, false);
             boolean hiddenApp = hidden.contains(app.pkg);
             hiddenIcon = manage || hiddenApp ? new UiIcon(UiIcon.Glyph.EYE_OFF, dp(18), WHITE, true) : null;
-            setFocusableInTouchMode(true);
-            setClickable(true);
             setContentDescription(app.name + (app.port != null ? "，" + inputStatus(app.port)
                     : hiddenApp ? "，已隐藏" : ""));
-            setOnFocusChangeListener((v, focused) -> focusChanged(v, focused));
+            invalidate();
         }
         @Override protected void onDraw(Canvas c){
             super.onDraw(c);float w=getWidth(),h=getHeight();boolean f=isFocused(),compact=app.port!=null&&group.id.equals("inputs")&&group.row&&!manage;float bottom=compact?h-dp(3):h-dp(27);r.set(dp(3),dp(3),w-dp(3),bottom);float radius=dp(12);p.setStyle(Paint.Style.FILL);
