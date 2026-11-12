@@ -65,3 +65,10 @@
 - 修复：仅改测试夹具，把 `waitForIdleSync()` 换成 `frames(a)`（等待实际绘制帧），已 post 的输入源扫描回调仍会先执行。产品源码、播放规则、排序、焦点、壁纸和低内存退路均未改动，不跳过或放宽任何检查，CI 的 display 超时也保持不变。
 - 修复后在同一 35.2.10 / API 23 环境按 CI 顺序复跑：fresh 30、upgrade 12、rules 71、display 249 全部通过，display 约 121 秒完成，第 177 项附近不再停顿。修复前后日志分别为 `emulator-local/api23-35210-display.txt`、`emulator-local/api23-35210-fixed-display.txt`。API 34 本地模拟器本轮重装目标 APK 时 ADB 安装超时，未取得修复后的本地回归结果；该环境既有的 249 项通过记录属于修复前夹具，不能算修复后证据，改由 CI 的 API 28/30 作业覆盖。
 - 修复提交后需重跑 CI；在 API 23/28/30 全绿之前仍不创建 tag 或 Release，也不回复 Issue #6。
+
+## 发布记录（2026-11-12）
+
+- 修复推送后的 [CI run 43240464664](https://github.com/zlsun2000/QuietTV/actions/runs/43240464664) 三个作业全部成功：API 23 约 5.7 分钟、API 28 约 8 分钟、API 30 约 8.8 分钟；API 23 未再触发 600 秒超时。
+- 用维护者正式密钥重新构建 1.0.1 / code 42：v1/v2/v3 签名与证书 `0e404b0dbdc95c2d0fa2a934b62deada42c2ea6541026ea24bff5378a01bbb4b` 核对通过，406 项核心检查、公开文件/历史/APK 审查通过（143 文件、1175 历史对象）。与先前同版本构建的 16 个 APK 条目内容一致，差异仅在签名块。
+- 创建 `v1.0.1` tag 并公开 [Release](https://github.com/zlsun2000/QuietTV/releases/tag/v1.0.1)：上传附件顺序为 `QuietTV-v1.0.1.apk`、`release-info.json`、`SHA256SUMS.txt`；下载 APK 的 SHA-256 与本地 `3b378cb253a53ca215e1340ce4d96b812e9476ca15ab5e1dd65cdb587b6eb1b5` 一致，tag 指向 `fbecbc5`。
+- 4K 界面、Google TV Streamer、TCL Android 9 和真实低内存设备仍未验证；TCL Android 12 仅只读确认过 1.0.0 信息，未做 1.0.1 覆盖安装实测。按维护者要求，Issue #6 待 4K 研究后再回复，本次未回复。
