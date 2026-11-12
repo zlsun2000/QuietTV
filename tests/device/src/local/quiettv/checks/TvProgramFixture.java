@@ -7,7 +7,7 @@ import android.os.Build;
 /** Disposable-emulator publisher. No media, network or owner-device operation. */
 public final class TvProgramFixture extends BroadcastReceiver {
     @Override public void onReceive(Context c,Intent request){
-        if(!(Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")))return;
+        if(!(Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")||(Build.FINGERPRINT.startsWith("google/sdk_google_atv_x86/emulator_x86_arm:14/")&&"ranchu".equals(Build.HARDWARE))))return;
         Uri table=Uri.parse("content://android.media.tv/watch_next_program");
         try{
             c.getContentResolver().delete(table,null,null);

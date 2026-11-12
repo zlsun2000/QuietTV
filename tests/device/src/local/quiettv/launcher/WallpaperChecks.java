@@ -32,7 +32,7 @@ public final class WallpaperChecks extends Instrumentation {
     }
     @Override public void onCreate(Bundle args){super.onCreate(args);start();}
     @Override public void onStart(){Bundle result=new Bundle();try{
-        if(!(Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")))throw new AssertionError("Disposable emulator only");
+        if(!(Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")||(Build.FINGERPRINT.startsWith("google/sdk_google_atv_x86/emulator_x86_arm:14/")&&"ranchu".equals(Build.HARDWARE))))throw new AssertionError("Disposable emulator only");
         Context c=getTargetContext();SharedPreferences home=c.getSharedPreferences("home",0);
         home.edit().putBoolean("setup_seen",true).putString("wallpaper_kind","builtin").putBoolean("wallpaper_motion",true).commit();c.getSharedPreferences("playback_history",0).edit().putBoolean("enabled",false).commit();c.getSharedPreferences("weather",0).edit().clear().commit();
         ActivityMonitor monitor=addMonitor(MainActivity.class.getName(),null,false);c.startActivity(new Intent(c,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));activity=(MainActivity)waitForMonitorWithTimeout(monitor,10000);removeMonitor(monitor);if(activity==null)throw new AssertionError("No launcher");check(await(()->{wallpaper=(Wallpapers)field(activity,"wallpapers");return wallpaper!=null&&imageReady();}),"initial builtin image is attached");frames();Thread.sleep(1200);

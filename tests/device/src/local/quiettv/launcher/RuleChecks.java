@@ -27,7 +27,7 @@ public final class RuleChecks extends Instrumentation {
     private Intent event(String id){return new Intent(EVENT).putExtra("packageName",PKG).putExtra("item",id).putExtra("name","Synthetic item").putExtra("at",83).putExtra("length",300);}
     private PlaybackRecord latest(Context c){ArrayList<PlaybackRecord> list=new HistoryStore(c).list();return list.isEmpty()?null:list.get(0);}
     @Override public void onStart(){Bundle result=new Bundle();Context c=getTargetContext();boolean owned=false;try{
-        if(!(Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")))throw new AssertionError("Only a synthetic emulator may run rule checks");
+        if(!(Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")||(Build.FINGERPRINT.startsWith("google/sdk_google_atv_x86/emulator_x86_arm:14/")&&"ranchu".equals(Build.HARDWARE))))throw new AssertionError("Only a synthetic emulator may run rule checks");
         c.getSharedPreferences("playback_rules",0).edit().clear().commit();c.getSharedPreferences("playback_history",0).edit().clear().putInt("config_schema",1).putBoolean("enabled",true).putBoolean("generic_enabled",false).commit();
         PlaybackRules registry=PlaybackRules.get(c);registry.reload();HistoryStore history=new HistoryStore(c);
         check(registry.list().size()==2&&registry.find(PlaybackRule.BILI)!=null&&registry.find(PlaybackRule.QIYI)!=null,"both existing channel contracts load from bundled JSON");

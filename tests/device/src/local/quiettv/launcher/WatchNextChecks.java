@@ -16,7 +16,7 @@ public final class WatchNextChecks extends Instrumentation {
     private interface Work{void run()throws Exception;}
     private void rejects(Work work,String label)throws Exception{boolean failed=false;try{work.run();}catch(Exception expected){failed=true;}check(failed,label);}
     @Override public void onStart(){Context c=getTargetContext();Bundle output=new Bundle();boolean owned=false;try{
-        if(Build.VERSION.SDK_INT<26||!(Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")))throw new AssertionError("Isolated API 26+ emulator only");
+        if(Build.VERSION.SDK_INT<26||!(Build.FINGERPRINT.contains("generic")||Build.MODEL.contains("sdk")||Build.MODEL.contains("Emulator")||(Build.FINGERPRINT.startsWith("google/sdk_google_atv_x86/emulator_x86_arm:14/")&&"ranchu".equals(Build.HARDWARE))))throw new AssertionError("Isolated API 26+ emulator only");
         c.getSharedPreferences("playback_history",0).edit().clear().putInt("config_schema",1).putBoolean("enabled",true).putBoolean("generic_enabled",true).commit();
         c.getSharedPreferences("playback_rules",0).edit().clear().commit();PlaybackRules registry=PlaybackRules.get(c);registry.reload();HistoryStore store=new HistoryStore(c);
         JSONObject json;try(java.io.InputStream in=getContext().getAssets().open("example-watch-next.json")){json=new JSONObject(PlaybackRules.read(in));}
