@@ -5,7 +5,7 @@ param(
     [string]$BuildTools='',
     [string]$Keystore='',
     [string]$Apk='',
-    [ValidateSet('display','settings','wallpaper','rules','fresh','upgrade')][string]$Phase='display',
+    [ValidateSet('display','settings','wallpaper','rules','fresh','upgrade','seed_v100','upgrade_v101')][string]$Phase='display',
     [string]$Serial='emulator-5570',
     [int]$ServerPort=5041,
     [switch]$ReuseChecks,
