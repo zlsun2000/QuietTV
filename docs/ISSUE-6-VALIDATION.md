@@ -57,3 +57,11 @@
 - 对失败作业发起一次重跑（attempt 2），在**同一检查之后**再次无输出并超时；不是偶发抖动，也不能归因于某项断言失败。API 28、API 30 与本地 API 34 的显示检查均通过。
 - `DisplayChecks.inputVisibility()` 开头会关闭并等待合成 HDMI 输入源扫描线程（`InputSources.dispose()`、`worker.awaitTermination`、`waitForIdleSync()`），随后才安装输入源夹具。挂起位置紧接该入口，需在 API 23 环境单独复现；目前没有证据断定是产品代码缺陷、测试夹具还是模拟器运行时问题，因此不改动产品源码、不跳过或放宽该检查。
 - 按「任何必要验证失败不发布」的约定：**未创建 v1.0.1 tag，未创建 draft/正式 Release，未回复 Issue #6**。源码、版本说明、验证记录与测试夹具已推送到 `origin/main`；正式密钥构建的 APK 与校验文件只在本地 `release/v1.0.1/`，未上传。待 API 23 挂起查清、CI 全绿后再核对构建证据并发布。
+
+## API 23 挂起定位与夹具修复（2026-11-12）
+
+- 在隔离环境下载官方 API 23 TV 镜像，并用与 CI 相同的官方 35.2.10 模拟器（build 12414864）启动；按 CI 顺序运行 fresh 30 / upgrade 12 / rules 71 后，完整 display 在**同一检查**（第 177 项 `hidden favorites leave recent independent in default layout`）之后停顿数分钟，随后仍可自行跑完 249 项。换用本地 37.2.13 模拟器时无停顿。这是旧模拟器运行时下的长时间等待，不是断言失败，也不是死锁。
+- 根因：`DisplayChecks.inputVisibility()` 隔离合成 HDMI 输入源夹具时调用无超时的 `waitForIdleSync()`，等待全局消息队列空闲；桌面带持续背景动画，`docs/COMPATIBILITY.md` 已写明设备检查「不依赖全局消息队列空闲」。该调用由 `e9e6092` 引入，与约定冲突；旧 TV 运行时上消息队列可能长时间不空闲，CI 的 600 秒 display 超时因此总在同一点终止作业。
+- 修复：仅改测试夹具，把 `waitForIdleSync()` 换成 `frames(a)`（等待实际绘制帧），已 post 的输入源扫描回调仍会先执行。产品源码、播放规则、排序、焦点、壁纸和低内存退路均未改动，不跳过或放宽任何检查，CI 的 display 超时也保持不变。
+- 修复后在同一 35.2.10 / API 23 环境按 CI 顺序复跑：fresh 30、upgrade 12、rules 71、display 249 全部通过，display 约 121 秒完成，第 177 项附近不再停顿。修复前后日志分别为 `emulator-local/api23-35210-display.txt`、`emulator-local/api23-35210-fixed-display.txt`。API 34 本地模拟器本轮重装目标 APK 时 ADB 安装超时，未取得修复后的本地回归结果；该环境既有的 249 项通过记录属于修复前夹具，不能算修复后证据，改由 CI 的 API 28/30 作业覆盖。
+- 修复提交后需重跑 CI；在 API 23/28/30 全绿之前仍不创建 tag 或 Release，也不回复 Issue #6。
