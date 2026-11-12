@@ -34,3 +34,19 @@
 ## 4K 窗口核对
 
 新建的 API 34 `tv_4k` 模拟器报告物理 3840×2160、普通应用窗口 1920×1080，原版截图为 1920×1080，保存在 `emulator-local/issue6-baseline/4k-device-1080-home.png`。清除模拟器内临时窗口覆盖后系统仍限制为 1080p。Android TV 的[平台配置](https://android.googlesource.com/device/google/atv/+/7744c276792cb868d5d24bb7e0a870e40b77a7d3/overlay/TvFrameworkOverlay/res/values/config.xml)包含宽度限制；[Android 显示文档](https://developer.android.com/reference/android/view/Display.Mode#getPhysicalWidth())也说明物理输出和普通应用 UI 分辨率可以不同。该结果不证明 Streamer 固件采用相同配置。
+
+维护者决定 1.0.1 先发布其他三项，原生 4K 界面另行研究；本版不调整电视全局显示设置，也不声称已解决 4K 界面清晰度。
+
+## 1.0.1 候选版回归
+
+- 使用临时测试密钥干净构建，406 项核心检查通过。独立 API 34 TV 模拟器：全新安装 31 项、显示 249 项、设置 166 项、壁纸恢复 68 项、规则 71 项、系统电视节目表 8 项和 Watch Next 37 项通过。模拟器的系统默认桌面因原厂优先级未被替换，该项未验证。
+- 在隔离模拟器上实际从临时签名的 1.0.0 / versionCode 41 覆盖安装 1.0.1 / versionCode 42：12 项检查通过，核对了合成收藏、隐藏项、分类与顺序、主页布局开关、壁纸文件和动效选择、播放记录与播放选择、已授权的电视节目表权限和未授权的通知访问。
+- 4K 界面、Google TV Streamer、TCL Android 9 和真实低内存电视均未验证。模拟器数据不代表这些设备的性能或体验。TCL Android 12 仅只读确认 1.0.0 / code 41 与窗口信息，未安装或测试 1.0.1。
+
+## 最后一次低内存失败排查（2026-11-12）
+
+- 连续运行合成 1.0.0 → 1.0.1 覆盖升级、壁纸和规则检查后，未清理测试应用数据便运行完整显示套件，报告 3 项失败：`split favorites is one horizontal row despite legacy grid preference`、`removing a favorite keeps focus on the next item`、`hiding an item keeps focus on the next visible item`。原始输出保留在 `emulator-local/emulator-5574/display-lowram-contaminated-20261112.txt`。该次运行原本只想执行移动与切换专项，用字符串数组转发开关未生效，实际跑了完整 249 项。
+- 复跑前确认设备为隔离 API 34 TV 模拟器（`ro.kernel.qemu=1`、`ro.hardware=ranchu`、官方 TV 指纹），清理 `local.quiettv.launcher` 的测试应用数据，并按 `tests/device/run.ps1` 相同步骤重建检查 APK。本地终端只有 PowerShell 5.1，不满足该脚本的 `#requires -Version 7.0`，因此改用明确的 `am instrument` 参数直接运行，不再依赖字符串数组转发开关。
+- 清理数据后：普通最终版完整显示 249 项通过；仅在本地副本强制 `isLowRamDevice()` 返回 true 的完整显示 249 项通过；该低内存副本的移动专项 33 项、上下切换专项 8 项（含低内存退路断言）通过。独立日志为 `emulator-local/emulator-5574/issue6-recheck-normal-display.txt`、`issue6-recheck-lowram-display.txt`、`issue6-recheck-lowram-moveonly.txt`、`issue6-recheck-lowram-transitiononly.txt`。
+- 三项失败在清理数据后均未复现，指向先前合成升级、壁纸和规则检查留下的测试应用偏好状态，而非本版三项改动的产品缺陷。本次未做单变量注入复现，不把具体残留字段写成已证实结论；显示套件应在清理测试应用数据后运行。产品源码未因本次排查修改，排序、焦点、壁纸和低内存退路保持原有行为。
+- 以上仍只是隔离模拟器结果，不能称为 Streamer、TCL Android 9 或真实低内存设备通过。
