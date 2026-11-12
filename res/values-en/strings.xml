@@ -133,7 +133,7 @@
     <string name="toolbar_inputs">Inputs</string>
     <string name="toolbar_tv_settings">TV settings</string>
     <string name="toolbar_home_settings">Launcher settings</string>
-    <string name="remote_navigation_hint">Use arrows to select · OK to open · Long press OK to organize</string>
+    <string name="remote_navigation_hint">Hold OK · Organize apps</string>
     <string name="remote_organize_hint">Press OK to hide or show apps · Back to finish</string>
     <string name="remote_move_hint">Use arrows to move · OK or Back to finish sorting</string>
     <string name="loading_desktop">Preparing your launcher…</string>

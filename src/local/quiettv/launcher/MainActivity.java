@@ -277,7 +277,7 @@ public class MainActivity extends Activity {
         } else {
             renderHomeRows();
         }
-        hint=wallpaperText(manage?getString(R.string.remote_organize_hint):getString(R.string.remote_navigation_hint),11,0xffc6d4dc);hint.setPaddingRelative(dp(48),dp(4),dp(48),dp(8));page.addView(hint);
+        hint=wallpaperText(manage?getString(R.string.remote_organize_hint):getString(R.string.remote_navigation_hint),12,0xffd7e4eb);hint.setPaddingRelative(dp(48),dp(4),dp(48),dp(8));page.addView(hint);
         historyLayout=historyFingerprint();View target=desiredSelection.isEmpty()?null:root.findViewWithTag(desiredSelection);if(target==null)for(ArrayList<View> row:focusRows){if(!row.isEmpty()&&row.get(0).getParent() instanceof CardRow){target=row.get(0);break;}}if(target==null)target=tools.get(0);target.requestFocus();tickClock();
         scheduleControlWarmup();
     }
@@ -519,7 +519,7 @@ public class MainActivity extends Activity {
         return button;
     }
     void focusChanged(final View v,boolean focused){
-        v.animate().scaleX(focused?1.045f:1).scaleY(focused?1.045f:1).translationY(0).setDuration(focused&&verticalFocusTransition?120:180).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();v.setTranslationZ(focused?dp(8):0);v.invalidate();if(focused){selected=(String)v.getTag();updateSelection(v);if(hint!=null)hint.setText(!moving.isEmpty()?"方向键移动卡片    确认键或返回键完成排序":manage?"确认键隐藏 / 显示应用    返回键完成整理":"方向键选择    确认键打开    长按确认键整理");v.post(()->revealFocusedView(v));}
+        v.animate().scaleX(focused?1.045f:1).scaleY(focused?1.045f:1).translationY(0).setDuration(focused&&verticalFocusTransition?120:180).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();v.setTranslationZ(focused?dp(8):0);v.invalidate();if(focused){selected=(String)v.getTag();updateSelection(v);if(hint!=null)hint.setText(!moving.isEmpty()?R.string.remote_move_hint:manage?R.string.remote_organize_hint:R.string.remote_navigation_hint);v.post(()->revealFocusedView(v));}
     }
     private boolean focusGeometryReady(View v){return scroll!=null&&v.getWidth()>0&&v.getHeight()>0&&scroll.getHeight()>0&&!v.isLayoutRequested()&&!scroll.isLayoutRequested();}
     private void revealFocusedView(final View v){

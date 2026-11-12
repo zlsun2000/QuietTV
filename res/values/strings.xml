@@ -99,7 +99,7 @@
     <string name="toolbar_inputs">输入源</string>
     <string name="toolbar_tv_settings">电视设置</string>
     <string name="toolbar_home_settings">桌面设置</string>
-    <string name="remote_navigation_hint">方向键选择    确认键打开    长按确认键整理</string>
+    <string name="remote_navigation_hint">长按确认键 · 整理应用</string>
     <string name="remote_organize_hint">确认键隐藏 / 显示应用    返回键完成整理</string>
     <string name="remote_move_hint">方向键移动卡片    确认键或返回键完成排序</string>
     <string name="loading_desktop">正在准备桌面…</string>

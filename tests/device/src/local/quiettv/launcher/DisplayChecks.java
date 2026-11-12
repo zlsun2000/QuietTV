@@ -160,6 +160,7 @@ public final class DisplayChecks extends Instrumentation {
         main(()->{page[0]=field(a,"desktopPage");View tile=((View)field(a,"root")).findViewWithTag(key);if(tile==null)throw new AssertionError("Missing "+key);tile.requestFocus();tile.performLongClick();});frames(a);choose(a,2);
         main(()->{
             check(page[0]==field(a,"desktopPage"),group+" "+split+" enters move mode without replacing the desktop");
+            android.widget.TextView hint=(android.widget.TextView)field(a,"hint");check(hint.getText().toString().equals(a.getString(R.string.remote_move_hint)),group+" "+split+" shows the contextual move hint");
             a.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_LEFT));
             check(!home.contains("order_"+group),group+" "+split+" ignores movement beyond the first item");
             a.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,grid?KeyEvent.KEYCODE_DPAD_DOWN:KeyEvent.KEYCODE_DPAD_RIGHT));
@@ -171,6 +172,7 @@ public final class DisplayChecks extends Instrumentation {
         main(()->{
             if(grid)a.onBackPressed();else a.getCurrentFocus().performClick();
             check(page[0]==field(a,"desktopPage"),group+" "+split+" finishes moving without replacing the desktop");
+            android.widget.TextView hint=(android.widget.TextView)field(a,"hint");check(hint.getText().toString().equals(a.getString(R.string.remote_navigation_hint)),group+" "+split+" restores the navigation hint");
             check(a.getCurrentFocus()!=null&&key.equals(a.getCurrentFocus().getTag()),group+" "+split+" retains focus after finishing");
             a.getCurrentFocus().performLongClick();
         });frames(a);
@@ -199,6 +201,9 @@ public final class DisplayChecks extends Instrumentation {
             for(int i=0;i<2;i++)a.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_UP));
         });frames(a);
         main(()->{View target=a.getCurrentFocus();check(target!=null&&(prefix+"10").equals(target.getTag()),"rapid vertical keys keep the most recent focus target");check(target!=null&&target.getParent() instanceof MainActivity.CardRow&&((MainActivity.CardRow)target.getParent()).fullyVisible(),"rapid vertical keys keep the focused row complete");});
+    }
+    private void hintPresentation(MainActivity a)throws Exception{
+        main(()->{android.widget.TextView hint=(android.widget.TextView)field(a,"hint");check(hint.getBackground()==null&&hint.getShadowRadius()>0,"navigation hint floats with a local text shadow");check(hint.getText().toString().equals(a.getString(R.string.remote_navigation_hint)),"navigation hint uses the current locale after focus changes");});
     }
     private void capacity(MainActivity a,String label)throws Exception {
         main(()->{if(((ArrayList<?>)field(a,"apps")).size()!=42)throw new AssertionError("Synthetic layout fixture was replaced during "+label);});
@@ -232,7 +237,7 @@ public final class DisplayChecks extends Instrumentation {
                 Properties properties=new Properties();properties.setProperty("grid.columns",String.valueOf(columns));set(a,"ui",new UiConfig(properties));a.loadGroups();a.render();
             });frames(a);
             if(moveOnly){moveCases(a,home,history);result.putString(failures.isEmpty()?"passed":"failed",count+" move checks; failures="+failures.toString());finish(failures.isEmpty()?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);return;}
-            if(transitionOnly){rowTransition(a,home);result.putString(failures.isEmpty()?"passed":"failed",count+" transition checks; failures="+failures.toString());finish(failures.isEmpty()?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);return;}
+            if(transitionOnly){rowTransition(a,home);hintPresentation(a);result.putString(failures.isEmpty()?"passed":"failed",count+" transition checks; failures="+failures.toString());finish(failures.isEmpty()?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);return;}
             final int[] initial={0};main(()->initial[0]=visible(a));check(initial[0]>=1,"scenario "+scenario+" starts with complete rows");
             // Delayed package events rebuild the desktop while a remote target is
             // below the initial viewport. Restore visibility after actual layout.
@@ -262,6 +267,7 @@ public final class DisplayChecks extends Instrumentation {
         emptyAndOrganize(a,home,history);
         moveCases(a,home,history);
         rowTransition(a,home);
+        hintPresentation(a);
         Wallpapers wallpaper=(Wallpapers)field(a,"wallpapers");File video=SyntheticVideo.create(new File(c.getCacheDir(),"synthetic-wallpaper.mp4"));CountDownLatch imported=new CountDownLatch(1);final boolean[] ok={false};wallpaper.importFile(video,(success,isVideo)->{ok[0]=success&&isVideo;imported.countDown();});check(imported.await(10,TimeUnit.SECONDS)&&ok[0],"synthetic silent video imports");main(a::render);
         long deadline=SystemClock.uptimeMillis()+10000;while(SystemClock.uptimeMillis()<deadline){frames(a);final boolean[] ready={false};main(()->ready[0]=wallpaper.videoCapability().isAvailable());if(ready[0])break;}
         final Object[] original=new Object[4];final long[] before={0};main(()->{original[0]=field(wallpaper,"layer");original[1]=field(wallpaper,"texture");original[2]=field(wallpaper,"surface");original[3]=field(wallpaper,"player");before[0]=(Long)field(wallpaper,"videoFrames");});check(original[3]!=null&&before[0]>0,"video decoder produces actual frames");
