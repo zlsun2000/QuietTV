@@ -20,7 +20,7 @@ App organization, the clock, and imported backgrounds work offline. Weather and 
 
 ## Upgrading
 
-- **Official 0.13.0–0.14.2 to 1.0.0** can be updated by installing the new APK over the existing app. Favorites, backgrounds, settings, and history are retained.
+- **Official 0.13.0–1.0.0 to 1.0.1** can be updated by installing the new APK over the existing app. Favorites, backgrounds, settings, and history are retained.
 - **0.12.0 or earlier:** the signing identity changed, so these installations cannot be updated directly with the newer official APK. Reinstallation requires uninstalling the old app, which **deletes its settings, favorites, backgrounds, and playback history**. Decide whether that data loss is acceptable before proceeding.
 - **Custom builds or APKs from other sources:** they may use a different signature. Check the source and error before uninstalling an app that contains data you need.
 

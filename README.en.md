@@ -36,7 +36,7 @@ For **Android 6.0+ TVs and boxes that allow third-party apps**.
 
 **Installing, handling the Home button, and starting at boot are separate capabilities.** Firmware can restrict each one. Some devices require extra setup or ADB troubleshooting; “no ADB for basic installation” does not cover every permission or adaptation workflow. Keep the stock launcher installed and enabled.
 
-**Upgrading:** official versions 0.13.0–0.14.1 can upgrade directly to 0.14.2 while retaining settings. Version 0.12.0 and earlier used a different signing identity. Uninstalling deletes settings, backgrounds, and history; see the [upgrade and recovery guide](docs/INSTALL.en.md#upgrading) first.
+**Upgrading:** official versions 0.13.0–1.0.0 can upgrade directly to 1.0.1 while retaining settings. Version 0.12.0 and earlier used a different signing identity. Uninstalling deletes settings, backgrounds, and history; see the [upgrade and recovery guide](docs/INSTALL.en.md#upgrading) first.
 
 To switch back, choose the stock launcher in the TV's default-app settings and turn off QuietTV's optional Home-key accessibility service if enabled. Opening another launcher once does not change the default.
 
