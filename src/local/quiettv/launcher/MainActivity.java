@@ -56,6 +56,7 @@ public class MainActivity extends Activity {
     private Runnable settingsReturn;
     private boolean settingsOpen;
     private String selected="",moving="";
+    private boolean verticalFocusTransition;
     private boolean manage=false;
     private int gridColumns=5,theme=0;
     private float uiScale=1.5f;
@@ -518,7 +519,7 @@ public class MainActivity extends Activity {
         return button;
     }
     void focusChanged(final View v,boolean focused){
-        v.animate().scaleX(focused?1.045f:1).scaleY(focused?1.045f:1).setDuration(180).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();v.setTranslationZ(focused?dp(8):0);v.invalidate();if(focused){selected=(String)v.getTag();updateSelection(v);if(hint!=null)hint.setText(!moving.isEmpty()?"方向键移动卡片    确认键或返回键完成排序":manage?"确认键隐藏 / 显示应用    返回键完成整理":"方向键选择    确认键打开    长按确认键整理");v.post(()->revealFocusedView(v));}
+        v.animate().scaleX(focused?1.045f:1).scaleY(focused?1.045f:1).translationY(0).setDuration(focused&&verticalFocusTransition?120:180).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();v.setTranslationZ(focused?dp(8):0);v.invalidate();if(focused){selected=(String)v.getTag();updateSelection(v);if(hint!=null)hint.setText(!moving.isEmpty()?"方向键移动卡片    确认键或返回键完成排序":manage?"确认键隐藏 / 显示应用    返回键完成整理":"方向键选择    确认键打开    长按确认键整理");v.post(()->revealFocusedView(v));}
     }
     private boolean focusGeometryReady(View v){return scroll!=null&&v.getWidth()>0&&v.getHeight()>0&&scroll.getHeight()>0&&!v.isLayoutRequested()&&!scroll.isLayoutRequested();}
     private void revealFocusedView(final View v){
@@ -630,7 +631,13 @@ public class MainActivity extends Activity {
     }
     @Override public boolean dispatchKeyEvent(KeyEvent e){
         int code=e.getKeyCode();boolean arrow=code==19||code==20||code==21||code==22;if(arrow&&e.getAction()==KeyEvent.ACTION_DOWN){View focused=getCurrentFocus();if(!moving.isEmpty()&&focused instanceof Tile){moveApp((Tile)focused,code);return true;}
-            for(int r=0;r<focusRows.size();r++){ArrayList<View> row=focusRows.get(r);int i=row.indexOf(focused);if(i<0)continue;int nr=r,ni=i;if(code==21)ni--;else if(code==22)ni++;else if(code==19)nr--;else nr++;if(nr>=0&&nr<focusRows.size()){ArrayList<View> next=focusRows.get(nr);if(nr!=r)ni=Math.min(ni,next.size()-1);if(ni>=0&&ni<next.size())next.get(ni).requestFocus();}return true;}
+            for(int r=0;r<focusRows.size();r++){ArrayList<View> row=focusRows.get(r);int i=row.indexOf(focused);if(i<0)continue;int nr=r,ni=i;if(code==21)ni--;else if(code==22)ni++;else if(code==19)nr--;else nr++;if(nr>=0&&nr<focusRows.size()){ArrayList<View> next=focusRows.get(nr);if(nr!=r)ni=Math.min(ni,next.size()-1);if(ni>=0&&ni<next.size()){
+                // Reuse the focus animation within the row's existing visibility inset.
+                View target=next.get(ni);boolean transition=nr!=r&&target.getParent() instanceof CardRow&&!isLowRamDevice()&&(Build.VERSION.SDK_INT<26||android.animation.ValueAnimator.areAnimatorsEnabled());
+                if(transition)target.setTranslationY(code==19?-dp(3):dp(3));
+                verticalFocusTransition=transition;
+                try{if(!target.requestFocus()&&transition)target.setTranslationY(0);}finally{verticalFocusTransition=false;}
+            }}return true;}
         }return super.dispatchKeyEvent(e);
     }
     private void beginMoving(App app,Group group){

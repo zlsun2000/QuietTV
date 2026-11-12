@@ -10,7 +10,9 @@ param(
     [int]$ServerPort=5041,
     [switch]$ReuseChecks,
     [switch]$FocusRefreshOnly,
-    [switch]$MoveOnly
+    [switch]$MoveOnly,
+    [switch]$TransitionOnly,
+    [switch]$ExpectLowRamPath
 )
 $ErrorActionPreference='Stop'
 if($Serial -notmatch '^emulator-[0-9]+$'){throw 'Only an explicitly created disposable emulator may run these tests'}
@@ -71,7 +73,8 @@ if($Phase -eq 'fresh'){Guest shell pm clear local.quiettv.launcher}
 if($Phase -eq 'rules'){Guest shell pm revoke local.quiettv.launcher android.permission.READ_TV_LISTINGS}
 Guest shell am force-stop local.quiettv.launcher
 $class=switch($Phase){'display'{'DisplayChecks'} 'settings'{'SettingsChecks'} 'wallpaper'{'WallpaperChecks'} 'rules'{'RuleChecks'} default{'DeviceChecks'}}
-$focusArgs=if($MoveOnly -and $Phase -eq 'display'){@('-e','issue6MoveOnly','true')}elseif($FocusRefreshOnly -and $Phase -eq 'display'){@('-e','focusRefreshOnly','true')}else{@()}
+$focusArgs=if($MoveOnly -and $Phase -eq 'display'){@('-e','issue6MoveOnly','true')}elseif($TransitionOnly -and $Phase -eq 'display'){@('-e','issue6TransitionOnly','true')}elseif($FocusRefreshOnly -and $Phase -eq 'display'){@('-e','focusRefreshOnly','true')}else{@()}
+if($ExpectLowRamPath -and $Phase -eq 'display'){$focusArgs+=@('-e','issue6ExpectLowRamPath','true')}
 $log=Guest shell am instrument -w -e phase $Phase @focusArgs "local.quiettv.checks/local.quiettv.launcher.$class"
 $log | Tee-Object -FilePath (Join-Path $project "emulator-local\$Serial\$Phase.txt")
 if(-not ($log -match 'INSTRUMENTATION_RESULT: passed=')){throw 'Emulator checks failed; inspect instrumentation output'}

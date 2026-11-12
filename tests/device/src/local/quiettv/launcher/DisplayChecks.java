@@ -11,9 +11,9 @@ import java.util.concurrent.*;
 
 /** Regression scenarios on a disposable emulator only; no accounts, apps or user media. */
 public final class DisplayChecks extends Instrumentation {
-    private boolean focusRefreshOnly,moveOnly;
+    private boolean focusRefreshOnly,moveOnly,transitionOnly,expectLowRamPath;
     private int count;private final ArrayList<String> failures=new ArrayList<>();
-    @Override public void onCreate(Bundle args){super.onCreate(args);focusRefreshOnly=args!=null&&"true".equals(args.getString("focusRefreshOnly"));moveOnly=args!=null&&"true".equals(args.getString("issue6MoveOnly"));start();}
+    @Override public void onCreate(Bundle args){super.onCreate(args);focusRefreshOnly=args!=null&&"true".equals(args.getString("focusRefreshOnly"));moveOnly=args!=null&&"true".equals(args.getString("issue6MoveOnly"));transitionOnly=args!=null&&"true".equals(args.getString("issue6TransitionOnly"));expectLowRamPath=args!=null&&"true".equals(args.getString("issue6ExpectLowRamPath"));start();}
     interface Work {void run()throws Exception;}
     private void main(Work work){final Throwable[] failure={null};runOnMainSync(()->{try{work.run();}catch(Throwable e){failure[0]=e;}});if(failure[0]!=null)throw new RuntimeException(failure[0]);}
     private Object field(Object owner,String name)throws Exception {Field f=owner.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(owner);}
@@ -182,6 +182,24 @@ public final class DisplayChecks extends Instrumentation {
         moveCase(a,home,history,"favorites",true,false);
         moveCase(a,home,history,"all",true,true);
     }
+    private void rowTransition(MainActivity a,SharedPreferences home)throws Exception{
+        final String prefix="all|local.quiettv.synthetic.app";
+        main(()->{home.edit().remove("order_all").putString("groups","[{\"id\":\"all\",\"title\":\"Synthetic grid\",\"row\":false}]").commit();a.loadGroups();a.render();});frames(a);
+        main(()->{View first=((View)field(a,"root")).findViewWithTag(prefix+"0");if(first==null)throw new AssertionError("Missing first transition card");first.requestFocus();});frames(a);
+        main(()->{
+            View target=((View)field(a,"root")).findViewWithTag(prefix+"5");if(target==null)throw new AssertionError("Missing next transition card");
+            a.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_DOWN));
+            ActivityManager manager=(ActivityManager)a.getSystemService(Context.ACTIVITY_SERVICE);
+            boolean animate=!expectLowRamPath&&(manager==null||!manager.isLowRamDevice())&&(Build.VERSION.SDK_INT<26||android.animation.ValueAnimator.areAnimatorsEnabled());
+            check(a.getCurrentFocus()==target,"vertical transition selects the next row");
+            check(animate?target.getTranslationY()>0:target.getTranslationY()==0,"vertical transition follows the low-memory and system-animation settings");
+        });frames(a);
+        main(()->{View target=a.getCurrentFocus();check(target!=null&&Math.abs(target.getTranslationY())<.01f,"vertical transition settles at the original position");check(target!=null&&target.getParent() instanceof MainActivity.CardRow&&((MainActivity.CardRow)target.getParent()).fullyVisible(),"vertical transition leaves the focused row complete");
+            for(int i=0;i<3;i++)a.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_DOWN));
+            for(int i=0;i<2;i++)a.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_UP));
+        });frames(a);
+        main(()->{View target=a.getCurrentFocus();check(target!=null&&(prefix+"10").equals(target.getTag()),"rapid vertical keys keep the most recent focus target");check(target!=null&&target.getParent() instanceof MainActivity.CardRow&&((MainActivity.CardRow)target.getParent()).fullyVisible(),"rapid vertical keys keep the focused row complete");});
+    }
     private void capacity(MainActivity a,String label)throws Exception {
         main(()->{if(((ArrayList<?>)field(a,"apps")).size()!=42)throw new AssertionError("Synthetic layout fixture was replaced during "+label);});
         final int[] actual={0},expected={0};final boolean[] focused={false};main(()->{View focus=a.getCurrentFocus();actual[0]=visible(a);if(focus==null||!(focus.getParent() instanceof MainActivity.CardRow))return;MainActivity.CardRow row=(MainActivity.CardRow)focus.getParent();focused[0]=row.fullyVisible();android.graphics.Rect bounds=row.cardBounds();MainActivity.CardScroll scroll=(MainActivity.CardScroll)field(a,"scroll");View content=(View)field(a,"content");HashSet<android.graphics.Rect> bands=new HashSet<>();for(MainActivity.CardRow r:rows(a))bands.add(r.cardBounds());for(int y=Math.max(0,bounds.bottom-scroll.getHeight());y<=Math.min(bounds.top,content.getHeight()-scroll.getHeight());y++){int n=0;for(android.graphics.Rect r:bands)if(r.top>=y&&r.bottom<=y+scroll.getHeight())n++;expected[0]=Math.max(expected[0],n);}});
@@ -206,7 +224,7 @@ public final class DisplayChecks extends Instrumentation {
         long scanDeadline=SystemClock.uptimeMillis()+10000;boolean settled=false;
         while(SystemClock.uptimeMillis()<scanDeadline){final boolean[] ready={false};main(()->ready[0]=!(Boolean)field(a,"appsLoading")&&!(Boolean)field(a,"appsDirty"));if(ready[0]){settled=true;break;}frames(a);}
         if(!settled)throw new AssertionError("Initial app discovery did not finish");
-        for(int scenario:moveOnly?new int[]{25}:focusRefreshOnly?new int[]{5}:new int[]{5,6,15,16,25,26}){final int columns=scenario%10;
+        for(int scenario:moveOnly?new int[]{25}:focusRefreshOnly||transitionOnly?new int[]{5}:new int[]{5,6,15,16,25,26}){final int columns=scenario%10;
             main(()->{
                 Dialog sheet=(Dialog)field(a,"sheet");if(sheet!=null)sheet.dismiss();ArrayList list=(ArrayList)field(a,"apps");Object template=list.get(0);Class<?> type=template.getClass();Constructor<?> constructor=type.getDeclaredConstructor();constructor.setAccessible(true);list.clear();
                 for(int i=0;i<42;i++){Object item=constructor.newInstance();for(String name:new String[]{"intent","icon","banner","color"})set(item,name,field(template,name));set(item,"pkg","local.quiettv.synthetic.app"+i);set(item,"name",String.format(Locale.US,"App %02d",i));list.add(item);}
@@ -214,6 +232,7 @@ public final class DisplayChecks extends Instrumentation {
                 Properties properties=new Properties();properties.setProperty("grid.columns",String.valueOf(columns));set(a,"ui",new UiConfig(properties));a.loadGroups();a.render();
             });frames(a);
             if(moveOnly){moveCases(a,home,history);result.putString(failures.isEmpty()?"passed":"failed",count+" move checks; failures="+failures.toString());finish(failures.isEmpty()?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);return;}
+            if(transitionOnly){rowTransition(a,home);result.putString(failures.isEmpty()?"passed":"failed",count+" transition checks; failures="+failures.toString());finish(failures.isEmpty()?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);return;}
             final int[] initial={0};main(()->initial[0]=visible(a));check(initial[0]>=1,"scenario "+scenario+" starts with complete rows");
             // Delayed package events rebuild the desktop while a remote target is
             // below the initial viewport. Restore visibility after actual layout.
@@ -242,6 +261,7 @@ public final class DisplayChecks extends Instrumentation {
         recentPresentation(a);
         emptyAndOrganize(a,home,history);
         moveCases(a,home,history);
+        rowTransition(a,home);
         Wallpapers wallpaper=(Wallpapers)field(a,"wallpapers");File video=SyntheticVideo.create(new File(c.getCacheDir(),"synthetic-wallpaper.mp4"));CountDownLatch imported=new CountDownLatch(1);final boolean[] ok={false};wallpaper.importFile(video,(success,isVideo)->{ok[0]=success&&isVideo;imported.countDown();});check(imported.await(10,TimeUnit.SECONDS)&&ok[0],"synthetic silent video imports");main(a::render);
         long deadline=SystemClock.uptimeMillis()+10000;while(SystemClock.uptimeMillis()<deadline){frames(a);final boolean[] ready={false};main(()->ready[0]=wallpaper.videoCapability().isAvailable());if(ready[0])break;}
         final Object[] original=new Object[4];final long[] before={0};main(()->{original[0]=field(wallpaper,"layer");original[1]=field(wallpaper,"texture");original[2]=field(wallpaper,"surface");original[3]=field(wallpaper,"player");before[0]=(Long)field(wallpaper,"videoFrames");});check(original[3]!=null&&before[0]>0,"video decoder produces actual frames");
