@@ -163,7 +163,7 @@ public final class DisplayChecks extends Instrumentation {
         main(()->{page[0]=field(a,"desktopPage");View tile=((View)field(a,"root")).findViewWithTag(key);if(tile==null)throw new AssertionError("Missing "+key);tile.requestFocus();tile.performLongClick();});frames(a);choose(a,2);
         main(()->{
             check(page[0]==field(a,"desktopPage"),group+" "+split+" enters move mode without replacing the desktop");
-            android.widget.TextView hint=(android.widget.TextView)field(a,"hint");check(hint.getText().toString().equals(a.getString(R.string.remote_move_hint)),group+" "+split+" shows the contextual move hint");
+            check(!containsText((View)field(a,"root"),a.getString(R.string.remote_move_hint)),group+" "+split+" does not add a desktop instruction bar");
             a.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_LEFT));
             check(!home.contains("order_"+group),group+" "+split+" ignores movement beyond the first item");
             a.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,grid?KeyEvent.KEYCODE_DPAD_DOWN:KeyEvent.KEYCODE_DPAD_RIGHT));
@@ -175,7 +175,7 @@ public final class DisplayChecks extends Instrumentation {
         main(()->{
             if(grid)a.onBackPressed();else a.getCurrentFocus().performClick();
             check(page[0]==field(a,"desktopPage"),group+" "+split+" finishes moving without replacing the desktop");
-            android.widget.TextView hint=(android.widget.TextView)field(a,"hint");check(hint.getText().toString().equals(a.getString(R.string.remote_navigation_hint)),group+" "+split+" restores the navigation hint");
+            check(!containsText((View)field(a,"root"),a.getString(R.string.remote_navigation_hint)),group+" "+split+" returns without a permanent desktop hint");
             check(a.getCurrentFocus()!=null&&key.equals(a.getCurrentFocus().getTag()),group+" "+split+" retains focus after finishing");
             a.getCurrentFocus().performLongClick();
         });frames(a);
@@ -205,8 +205,9 @@ public final class DisplayChecks extends Instrumentation {
         });frames(a);
         main(()->{View target=a.getCurrentFocus();check(target!=null&&(prefix+"10").equals(target.getTag()),"rapid vertical keys keep the most recent focus target");check(target!=null&&target.getParent() instanceof MainActivity.CardRow&&((MainActivity.CardRow)target.getParent()).fullyVisible(),"rapid vertical keys keep the focused row complete");});
     }
+    private static boolean containsText(View root,String text){ArrayList<View> matches=new ArrayList<>();root.findViewsWithText(matches,text,View.FIND_VIEWS_WITH_TEXT);return !matches.isEmpty();}
     private void hintPresentation(MainActivity a)throws Exception{
-        main(()->{android.widget.TextView hint=(android.widget.TextView)field(a,"hint");check(hint.getBackground()==null&&hint.getShadowRadius()>0,"navigation hint floats with a local text shadow");check(hint.getText().toString().equals(a.getString(R.string.remote_navigation_hint)),"navigation hint uses the current locale after focus changes");});
+        main(()->{check(!containsText((View)field(a,"root"),a.getString(R.string.remote_navigation_hint)),"desktop has no permanent navigation hint");a.showSetup();Dialog dialog=(Dialog)field(a,"sheet");check(dialog!=null&&containsText(dialog.getWindow().getDecorView(),a.getString(R.string.setup_navigation_guide)),"setup help explains remote navigation and organizing");if(dialog!=null)dialog.dismiss();set(a,"settingsOpen",false);});
     }
     private void capacity(MainActivity a,String label)throws Exception {
         main(()->{if(((ArrayList<?>)field(a,"apps")).size()!=42)throw new AssertionError("Synthetic layout fixture was replaced during "+label);});

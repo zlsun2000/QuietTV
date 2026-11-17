@@ -136,6 +136,15 @@
     <string name="remote_navigation_hint">Hold OK · Organize apps</string>
     <string name="remote_organize_hint">Press OK to hide or show apps · Back to finish</string>
     <string name="remote_move_hint">Use arrows to move · OK or Back to finish sorting</string>
+    <string name="setup_navigation_guide">Use the arrow keys to choose and OK to open. Hold OK to organize an app. When moving an app, use the arrows and press OK or Back to finish.</string>
+    <string name="setup_home_active">QuietTV is the default Home app</string>
+    <string name="setup_home_inactive">QuietTV is not the default Home app</string>
+    <string name="setup_features">The launcher is ready to use. Weather and playback history are off by default and can be enabled in settings.</string>
+    <string name="setup_home_behavior">Your TV decides what opens when you press Home or restart. Some Google TV devices prefer their original launcher; the optional Home key fix may help. The original launcher remains available through your system default app settings.</string>
+    <string name="home_4k">4K desktop</string>
+    <string name="home_4k_detail">Requires 4K output and may use more memory</string>
+    <string name="home_4k_unavailable">4K desktop is unavailable for this output or device memory</string>
+    <string name="home_4k_fallback">4K desktop is unavailable; standard rendering was restored</string>
     <string name="loading_desktop">Preparing your launcher…</string>
     <string name="empty_favorites_hint">Long press an app card to add it to Favorites</string>
     <string name="empty_group_hint">Add apps to this group from the app menu</string>

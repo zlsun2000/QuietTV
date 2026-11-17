@@ -22,6 +22,7 @@ final class Wallpapers {
     private FrameLayout layer;private PhotoView image;private TextureView texture;
     private String attachedKey="";private boolean attachedMotion;
     private Bitmap cached;private String cachedKey="",loadingKey="";
+    private boolean highResolutionImages;private int targetWidth,targetHeight,imageGeneration;private long backdropRevision;
     private MediaPlayer player;private Surface surface;private ValueAnimator motion;
     private boolean active=false,disposed=false,videoFailed=false;private String videoFailedPath="";
     private boolean videoReady=false;
@@ -49,6 +50,15 @@ final class Wallpapers {
     private final Runnable videoFrameGuard=new Runnable(){public void run(){MediaPlayer p=player;if(p==null||!active||disposed||!videoReady)return;try{long stalled=android.os.SystemClock.uptimeMillis()-lastVideoFrameAt;if((!p.isPlaying()||videoFrames==guardVideoFrames)&&stalled>15000){failedVideo();return;}guardVideoFrames=videoFrames;videoHandler.postDelayed(this,5000);}catch(Exception e){if(player==p)failedVideo();}}};
     Wallpapers(Activity a,SharedPreferences p){owner=a;prefs=p;}
     String kind(){return prefs.getString("wallpaper_kind","builtin");}
+    View highResolutionBackdrop(){return kind().equals("video")?null:layer;}
+    boolean staticBackdrop(){return kind().equals("theme")||!prefs.getBoolean("wallpaper_motion",true);}
+    long backdropRevision(){return backdropRevision;}
+    void highResolutionImages(boolean enabled,int width,int height){
+        if(!enabled){width=0;height=0;}
+        if(highResolutionImages==enabled&&targetWidth==width&&targetHeight==height)return;
+        highResolutionImages=enabled;targetWidth=width;targetHeight=height;imageGeneration++;cachedKey="";loadingKey="";
+        if(image!=null&&!kind().equals("video"))loadImage();
+    }
     DeviceCapability videoCapability(){if(!kind().equals("video"))return DeviceCapability.inactive("video_wallpaper","未使用");if(videoFailed)return DeviceCapability.unsupported("video_wallpaper","失败，已回退静态背景");if(videoReady&&videoFrames>0)return DeviceCapability.available("video_wallpaper",owner.getString(R.string.video_frames_output));if(videoReady)return DeviceCapability.waiting("video_wallpaper",owner.getString(R.string.video_waiting_first_frame));return DeviceCapability.waiting("video_wallpaper",active?"正在准备":"已暂停");}
     String videoStatus(){return videoCapability().reason;}
     File library(){File f=owner.getExternalFilesDir("backgrounds");if(f==null)f=new File(owner.getFilesDir(),"backgrounds");f.mkdirs();return f;}
@@ -81,13 +91,14 @@ final class Wallpapers {
         final String key=kind().equals("image")?prefs.getString("wallpaper_path",""):"builtin";
         if(key.equals(cachedKey)&&cached!=null){showImage();return;}
         if(key.equals(loadingKey))return;loadingKey=key;
-        final int w=owner.getResources().getDisplayMetrics().widthPixels,h=owner.getResources().getDisplayMetrics().heightPixels;
-        worker.execute(new Runnable(){public void run(){Bitmap b=null;try{BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;decode(key,bounds);BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=1;android.app.ActivityManager manager=(android.app.ActivityManager)owner.getSystemService(Activity.ACTIVITY_SERVICE);long maxPixels=manager!=null&&manager.isLowRamDevice()?2500000L:6000000L;while(bounds.outWidth>0&&bounds.outHeight>0&&((long)(bounds.outWidth/options.inSampleSize)*(bounds.outHeight/options.inSampleSize)>maxPixels||bounds.outWidth/options.inSampleSize>w*1.5f||bounds.outHeight/options.inSampleSize>h*1.5f)){if(options.inSampleSize>16384)break;options.inSampleSize*=2;}b=decode(key,options);}catch(Throwable ignored){}
-            final Bitmap bitmap=b;owner.runOnUiThread(new Runnable(){public void run(){if(disposed){if(bitmap!=null)bitmap.recycle();return;}loadingKey="";String current=kind().equals("image")?prefs.getString("wallpaper_path",""):"builtin";if(!key.equals(current)){if(bitmap!=null)bitmap.recycle();return;}if(bitmap==null){Toast.makeText(owner,"图片暂时无法读取，请更换背景",Toast.LENGTH_LONG).show();return;}Bitmap previous=cached;if(image!=null)image.setImageBitmap(null);cached=bitmap;cachedKey=key;if(previous!=null&&previous!=bitmap&&!previous.isRecycled())previous.recycle();showImage();status();}});
+        final int generation=++imageGeneration;final boolean high=highResolutionImages;
+        final int w=high&&targetWidth>0?targetWidth:owner.getResources().getDisplayMetrics().widthPixels,h=high&&targetHeight>0?targetHeight:owner.getResources().getDisplayMetrics().heightPixels;
+        worker.execute(new Runnable(){public void run(){Bitmap b=null;try{BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;decode(key,bounds);BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=1;android.app.ActivityManager manager=(android.app.ActivityManager)owner.getSystemService(Activity.ACTIVITY_SERVICE);long maxPixels=manager!=null&&manager.isLowRamDevice()?2500000L:high?10000000L:6000000L;while(bounds.outWidth>0&&bounds.outHeight>0&&((long)(bounds.outWidth/options.inSampleSize)*(bounds.outHeight/options.inSampleSize)>maxPixels||bounds.outWidth/options.inSampleSize>w*1.5f||bounds.outHeight/options.inSampleSize>h*1.5f)){if(options.inSampleSize>16384)break;options.inSampleSize*=2;}b=decode(key,options);}catch(Throwable ignored){}
+            final Bitmap bitmap=b;owner.runOnUiThread(new Runnable(){public void run(){if(disposed){if(bitmap!=null)bitmap.recycle();return;}if(generation!=imageGeneration){if(bitmap!=null)bitmap.recycle();return;}loadingKey="";String current=kind().equals("image")?prefs.getString("wallpaper_path",""):"builtin";if(!key.equals(current)){if(bitmap!=null)bitmap.recycle();return;}if(bitmap==null){Toast.makeText(owner,"图片暂时无法读取，请更换背景",Toast.LENGTH_LONG).show();return;}Bitmap previous=cached;if(image!=null)image.setImageBitmap(null);cached=bitmap;cachedKey=key;if(previous!=null&&previous!=bitmap&&!previous.isRecycled())previous.recycle();showImage();status();}});
         }});
     }
     private Bitmap decode(String key,BitmapFactory.Options o){o.inScaled=false;Bitmap bitmap=key.equals("builtin")?BitmapFactory.decodeResource(owner.getResources(),R.raw.nature_lake,o):BitmapFactory.decodeFile(key,o);if(bitmap==null||key.equals("builtin")||o.inJustDecodeBounds)return bitmap;try{android.media.ExifInterface exif=new android.media.ExifInterface(key);int orientation=exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION,1);Matrix m=new Matrix();switch(orientation){case 2:m.setScale(-1,1);break;case 3:m.setRotate(180);break;case 4:m.setScale(1,-1);break;case 5:m.setRotate(90);m.postScale(-1,1);break;case 6:m.setRotate(90);break;case 7:m.setRotate(270);m.postScale(-1,1);break;case 8:m.setRotate(270);break;default:return bitmap;}Bitmap oriented=Bitmap.createBitmap(bitmap,0,0,bitmap.getWidth(),bitmap.getHeight(),m,true);if(oriented!=bitmap)bitmap.recycle();return oriented;}catch(Exception ignored){return bitmap;}}
-    private void showImage(){if(image!=null&&cached!=null){image.setImageBitmap(cached);if(active)animatePhoto();}}
+    private void showImage(){if(image!=null&&cached!=null){backdropRevision++;image.setImageBitmap(cached);if(active)animatePhoto();}}
     void resume(){
         active=true;
         // UI_HIDDEN can recycle the image while another app is in front. The

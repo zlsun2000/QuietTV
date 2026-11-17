@@ -146,23 +146,26 @@ public final class DeviceChecks extends Instrumentation {
             home.edit().remove("config_schema").remove("home_split_rows").remove("home_show_favorites").putStringSet("favorites",new HashSet<>(Arrays.asList("com.example.saved"))).putString("wallpaper_kind","theme").putInt("theme",2).putString("groups","[{\"id\":\"favorites\",\"title\":\"Saved category\",\"row\":true},{\"id\":\"all\",\"title\":\"Apps\",\"row\":false}]").commit();
             history.edit().remove("config_schema").putBoolean("enabled",false).putBoolean("generic_enabled",true).putBoolean("music_enabled",false).putString("records","[{\"id\":\"123456\",\"eid\":\"789\",\"title\":\"Synthetic legacy upgrade\",\"command\":\"tcl/ugc\",\"position\":123456,\"duration\":600000,\"updated\":1}]").commit();
             PlaybackRules registry=PlaybackRules.get(c);JSONObject custom=new JSONObject(registry.find(PlaybackRule.BILI).json.toString()).put("id","example.upgrade").put("name","Synthetic upgrade rule");PlaybackRule upgradeRule=registry.parse(custom.toString());registry.install(upgradeRule);registry.enabled(registry.find(PlaybackRule.BILI),false);registry.enabled(registry.find(upgradeRule.id),true);
-        }else if("seed_v100".equals(phase)){
-            check(c.getPackageManager().getPackageInfo(c.getPackageName(),0).versionCode==41,"upgrade fixture starts on versionCode 41");
+        }else if("seed_v100".equals(phase)||"seed_v101".equals(phase)){
+            int expected="seed_v101".equals(phase)?42:41;
+            check(c.getPackageManager().getPackageInfo(c.getPackageName(),0).versionCode==expected,"upgrade fixture starts on versionCode "+expected);
             Wallpapers wallpapers=(Wallpapers)field(activity,"wallpapers");File image=new File(wallpapers.library(),"issue6-upgrade.png");
             Bitmap bitmap=Bitmap.createBitmap(8,8,Bitmap.Config.ARGB_8888);bitmap.eraseColor(0xff2468ac);
             try(FileOutputStream out=new FileOutputStream(image)){if(!bitmap.compress(Bitmap.CompressFormat.PNG,100,out))throw new IOException("Synthetic wallpaper could not be saved");}finally{bitmap.recycle();}
             home.edit().putBoolean("favorites_initialized",true).putStringSet("favorites",new HashSet<>(Arrays.asList("com.example.saved","com.example.second")))
                     .putStringSet("hidden",new HashSet<>(Arrays.asList("com.example.hidden"))).putString("order_favorites","[\"com.example.second\",\"com.example.saved\"]")
                     .putString("groups","[{\"id\":\"favorites\",\"title\":\"Saved category\",\"row\":true},{\"id\":\"recent\",\"title\":\"Recent\",\"row\":true},{\"id\":\"all\",\"title\":\"Apps\",\"row\":false}]")
-                    .putBoolean("home_split_rows",true).putBoolean("home_show_favorites",false).putBoolean("home_show_inputs",false)
+                    .putBoolean("home_split_rows",true).putBoolean("home_show_favorites",false).putBoolean("home_show_inputs",false).putBoolean("setup_seen",true).remove("home_4k")
                     .putString("wallpaper_kind","image").putString("wallpaper_path",image.getAbsolutePath()).putBoolean("wallpaper_motion",false).commit();
             history.edit().putBoolean("enabled",true).putBoolean("generic_enabled",false).putBoolean("music_enabled",false)
                     .putStringSet("blocked_media_apps",new HashSet<>(Arrays.asList("com.example.blocked")))
                     .putString("records","[{\"id\":\"123456\",\"eid\":\"789\",\"title\":\"Synthetic 1.0.0 record\",\"command\":\"tcl/ugc\",\"position\":123456,\"duration\":600000,\"updated\":1}]").commit();
             check(image.isFile()&&home.getBoolean("home_split_rows",false),"version 1.0.0 synthetic preferences and wallpaper are prepared");
             check(new HistoryStore(c).list().size()==1,"version 1.0.0 synthetic playback record is prepared");
-        }else if("upgrade_v101".equals(phase)){
-            check(c.getPackageManager().getPackageInfo(c.getPackageName(),0).versionCode==42,"covering install actually upgrades to versionCode 42");
+        }else if("upgrade_v101".equals(phase)||"upgrade_v102".equals(phase)){
+            int expected="upgrade_v102".equals(phase)?43:42;
+            check(c.getPackageManager().getPackageInfo(c.getPackageName(),0).versionCode==expected,"covering install actually upgrades to versionCode "+expected);
+            if(expected==43)check(!home.getBoolean("home_4k",false)&&home.getBoolean("setup_seen",false),"4K defaults off and existing users are not shown first-use help again");
             Set<String> favorites=home.getStringSet("favorites",Collections.<String>emptySet());
             check(favorites.contains("com.example.saved")&&favorites.contains("com.example.second"),"1.0.0 favorites survive covering upgrade");
             check(home.getStringSet("hidden",Collections.<String>emptySet()).contains("com.example.hidden"),"1.0.0 hidden apps survive covering upgrade");

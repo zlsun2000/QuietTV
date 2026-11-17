@@ -6,6 +6,7 @@ import android.content.*;
 import android.content.pm.*;
 import android.graphics.*;
 import android.graphics.drawable.*;
+import android.hardware.display.DisplayManager;
 import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.provider.Settings;
@@ -38,10 +39,23 @@ public class MainActivity extends Activity {
     private final Handler handler=new Handler();
     private final ExecutorService storageWorker=Executors.newSingleThreadExecutor();
     private FrameLayout root;
+    private HiResSurface highResolution;
+    private HiResSurface dialogHighResolution;
+    private boolean highResolutionConfigured;
+    private String displaySignature="";
+    private DisplayManager displayManager;
+    private final DisplayManager.DisplayListener displayListener=new DisplayManager.DisplayListener(){
+        public void onDisplayAdded(int id){}
+        public void onDisplayRemoved(int id){}
+        public void onDisplayChanged(int id){
+            if(id!=getWindowManager().getDefaultDisplay().getDisplayId()||!foreground||desktopPage==null)return;
+            if(!displaySignature.equals(currentDisplaySignature()))refreshHomeLayout();
+        }
+    };
     private LinearLayout desktopPage;
     private LinearLayout content;
     private CardScroll scroll;
-    private TextView clock,dateLabel,hint,selectionTitle,selectionSubtitle;
+    private TextView clock,dateLabel,selectionTitle,selectionSubtitle;
     private Dialog sheet;
     private ControlCenter controlCenter;
     private boolean controlWarmScheduled;
@@ -93,6 +107,8 @@ public class MainActivity extends Activity {
         ui=UiConfig.load(this);
         updateUiMetrics();
         getWindow().getDecorView().setSystemUiVisibility(5894);
+        displayManager=(DisplayManager)getSystemService(DISPLAY_SERVICE);
+        if(displayManager!=null)displayManager.registerDisplayListener(displayListener,handler);
         if(Build.VERSION.SDK_INT>=24){registerReceiver(userUnlockReceiver,new IntentFilter(Intent.ACTION_USER_UNLOCKED));unlockReceiverRegistered=true;}
         IntentFilter timeFilter=new IntentFilter();timeFilter.addAction(Intent.ACTION_TIME_CHANGED);timeFilter.addAction(Intent.ACTION_TIMEZONE_CHANGED);timeFilter.addAction(Intent.ACTION_DATE_CHANGED);registerReceiver(timeChanged,timeFilter);timeReceiverRegistered=true;
     }
@@ -142,14 +158,14 @@ public class MainActivity extends Activity {
         label.addView(text(getString(R.string.app_name),40,WHITE));label.addView(text(getString(R.string.loading_desktop),18,WHITE));
         root.addView(label,new FrameLayout.LayoutParams(-1,-1));setContentView(root);
     }
-    @Override public void onResume(){super.onResume();foreground=true;startNetworkStatus();confirmHomeKeyReturn(getIntent());resumeHome();if(settingsReturn!=null&&prefs!=null){Runnable page=settingsReturn;settingsReturn=null;page.run();}}
+    @Override public void onResume(){super.onResume();foreground=true;if(highResolution!=null)highResolution.setVisibility(View.VISIBLE);startNetworkStatus();confirmHomeKeyReturn(getIntent());resumeHome();if(desktopPage!=null&&!displaySignature.equals(currentDisplaySignature()))refreshHomeLayout();if(settingsReturn!=null&&prefs!=null){Runnable page=settingsReturn;settingsReturn=null;page.run();}}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);confirmHomeKeyReturn(intent);}
     private void confirmHomeKeyReturn(Intent intent){if(intent!=null&&intent.getBooleanExtra("quiettv.home_key_request",false)&&prefs!=null){prefs.edit().putLong("home_key_last_return",System.currentTimeMillis()).remove("home_key_pending").apply();intent.removeExtra("quiettv.home_key_request");}}
     private boolean isLowRamDevice(){try{android.app.ActivityManager manager=(android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE);return manager!=null&&manager.isLowRamDevice();}catch(Exception ignored){return false;}}
-    @Override public void onPause(){foreground=false;stopNetworkStatus();handler.removeCallbacks(waitForUnlock);handler.removeCallbacks(resizeHome);handler.removeCallbacks(tick);if(weather!=null)weather.stop();if(wallpapers!=null)wallpapers.pause();super.onPause();}
+    @Override public void onPause(){foreground=false;if(highResolution!=null)highResolution.setVisibility(View.INVISIBLE);stopNetworkStatus();handler.removeCallbacks(waitForUnlock);handler.removeCallbacks(resizeHome);handler.removeCallbacks(tick);if(weather!=null)weather.stop();if(wallpapers!=null)wallpapers.pause();super.onPause();}
     @Override public void onSaveInstanceState(Bundle out){out.putString("quiettv.focus",selected);super.onSaveInstanceState(out);}
-    @Override public void onTrimMemory(int level){super.onTrimMemory(level);if(wallpapers!=null)wallpapers.trimMemory(level);if(level>=android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)invalidateControlCenter();}
-    @Override public void onDestroy(){settingsReturn=null;if(sheet!=null){sheet.setOnCancelListener(null);sheet.dismiss();}handler.removeCallbacks(waitForUnlock);handler.removeCallbacks(resizeHome);handler.removeCallbacks(tick);handler.removeCallbacks(reloadApps);if(unlockReceiverRegistered)unregisterReceiver(userUnlockReceiver);if(timeReceiverRegistered)unregisterReceiver(timeChanged);if(historyReceiverRegistered)unregisterReceiver(historyChanged);if(legacyHistoryOwned){LegacyHistoryListener.release();legacyHistoryOwned=false;}if(packageReceiverRegistered)unregisterReceiver(packagesChanged);storageWorker.shutdownNow();if(inputSources!=null)inputSources.dispose();if(weather!=null)weather.dispose();if(covers!=null)covers.dispose();if(biliMetadata!=null)biliMetadata.dispose();if(wallpapers!=null)wallpapers.dispose();super.onDestroy();}
+    @Override public void onTrimMemory(int level){super.onTrimMemory(level);if(wallpapers!=null)wallpapers.trimMemory(level);if(highResolution!=null&&level>=android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)highResolution.releaseCache();if(foreground&&level>=android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL&&level<android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN)disableHighResolution();if(level>=android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)invalidateControlCenter();}
+    @Override public void onDestroy(){settingsReturn=null;if(sheet!=null){sheet.setOnCancelListener(null);sheet.dismiss();}if(displayManager!=null)displayManager.unregisterDisplayListener(displayListener);handler.removeCallbacks(waitForUnlock);handler.removeCallbacks(resizeHome);handler.removeCallbacks(tick);handler.removeCallbacks(reloadApps);if(unlockReceiverRegistered)unregisterReceiver(userUnlockReceiver);if(timeReceiverRegistered)unregisterReceiver(timeChanged);if(historyReceiverRegistered)unregisterReceiver(historyChanged);if(legacyHistoryOwned){LegacyHistoryListener.release();legacyHistoryOwned=false;}if(packageReceiverRegistered)unregisterReceiver(packagesChanged);storageWorker.shutdownNow();if(inputSources!=null)inputSources.dispose();if(weather!=null)weather.dispose();if(covers!=null)covers.dispose();if(biliMetadata!=null)biliMetadata.dispose();if(wallpapers!=null)wallpapers.dispose();super.onDestroy();}
     int dp(float n){return Math.round(n*uiScale);}
     int sp(float n){return Math.round(dp(n)*getResources().getConfiguration().fontScale);}
     TextView text(String value,int size,int color){TextView t=new TextView(this);t.setText(value);t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,sp(size));t.setTextColor(color);t.setFontFeatureSettings("kern");t.setIncludeFontPadding(false);return t;}
@@ -235,7 +251,7 @@ public class MainActivity extends Activity {
         final String desiredSelection=selected;
         refreshRecordActions();
         boolean newRoot=desktopPage==null;
-        if(newRoot)root=new FrameLayout(this);else root.removeView(desktopPage);
+        if(newRoot)root=new HomeLayer(this);else root.removeView(desktopPage);
         wallpapers.attach(root,theme);LinearLayout page=new LinearLayout(this);desktopPage=page;page.setOrientation(LinearLayout.VERTICAL);root.addView(page,new FrameLayout.LayoutParams(-1,-1));if(newRoot)setContentView(root);
         final FrameLayout measuredRoot=root;
         if(newRoot)root.addOnLayoutChangeListener(new View.OnLayoutChangeListener(){public void onLayoutChange(View v,int l,int t,int r,int b,int oldL,int oldT,int oldR,int oldB){if(root==measuredRoot&&foreground&&r>l&&b>t){handler.removeCallbacks(resizeHome);handler.post(resizeHome);}}});
@@ -277,7 +293,7 @@ public class MainActivity extends Activity {
         } else {
             renderHomeRows();
         }
-        hint=wallpaperText(manage?getString(R.string.remote_organize_hint):getString(R.string.remote_navigation_hint),12,0xffd7e4eb);hint.setPaddingRelative(dp(48),dp(4),dp(48),dp(8));page.addView(hint);
+        configureHighResolution(page);
         historyLayout=historyFingerprint();View target=desiredSelection.isEmpty()?null:root.findViewWithTag(desiredSelection);if(target==null)for(ArrayList<View> row:focusRows){if(!row.isEmpty()&&row.get(0).getParent() instanceof CardRow){target=row.get(0);break;}}if(target==null)target=tools.get(0);target.requestFocus();tickClock();
         scheduleControlWarmup();
     }
@@ -505,7 +521,7 @@ public class MainActivity extends Activity {
         row.addView(button,new LinearLayout.LayoutParams(-2,dp(72)));content.addView(row);ArrayList<View> focuses=new ArrayList<>();focuses.add(button);focusRows.add(focuses);content.addView(new View(this),new LinearLayout.LayoutParams(1,dp(6)));
     }
     Tile makeTile(final App a,final Group group){
-        final Tile t=new Tile(this,a,group);t.setId(View.generateViewId());t.setOnClickListener(new View.OnClickListener(){public void onClick(View v){if(!moving.isEmpty()){finishMoving();return;}App current=t.app;if(manage){if(hidden.contains(current.pkg))hidden.remove(current.pkg);else hidden.add(current.pkg);save();t.setContentDescription(current.name+(hidden.contains(current.pkg)?"，已隐藏":"，已显示"));t.invalidate();hint.setText(current.name+(hidden.contains(current.pkg)?" 已隐藏":" 已显示"));}else openApp(current);}});
+        final Tile t=new Tile(this,a,group);t.setId(View.generateViewId());t.setOnClickListener(new View.OnClickListener(){public void onClick(View v){if(!moving.isEmpty()){finishMoving();return;}App current=t.app;if(manage){if(hidden.contains(current.pkg))hidden.remove(current.pkg);else hidden.add(current.pkg);save();t.setContentDescription(current.name+(hidden.contains(current.pkg)?"，已隐藏":"，已显示"));t.invalidate();Toast.makeText(MainActivity.this,current.name+(hidden.contains(current.pkg)?" 已隐藏":" 已显示"),Toast.LENGTH_SHORT).show();}else openApp(current);}});
         t.setOnLongClickListener(new View.OnLongClickListener(){public boolean onLongClick(View v){selected=(String)t.getTag();showAppMenu(t.app,t.group);return true;}});return t;
     }
     Tool tool(String label, String tag, UiIcon.Glyph glyph, Runnable action) {
@@ -519,7 +535,11 @@ public class MainActivity extends Activity {
         return button;
     }
     void focusChanged(final View v,boolean focused){
-        v.animate().scaleX(focused?1.045f:1).scaleY(focused?1.045f:1).translationY(0).setDuration(focused&&verticalFocusTransition?120:180).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();v.setTranslationZ(focused?dp(8):0);v.invalidate();if(focused){selected=(String)v.getTag();updateSelection(v);if(hint!=null)hint.setText(!moving.isEmpty()?R.string.remote_move_hint:manage?R.string.remote_organize_hint:R.string.remote_navigation_hint);v.post(()->revealFocusedView(v));}
+        if(highResolution!=null)highResolution.pulse(250);
+        // Shorten the previous card's return so rapid key presses leave fewer
+        // simultaneous focus animations, while keeping the selected animation.
+        long duration=focused?(verticalFocusTransition?120:180):90;
+        v.animate().scaleX(focused?1.045f:1).scaleY(focused?1.045f:1).translationY(0).setDuration(duration).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();v.setTranslationZ(focused?dp(8):0);v.invalidate();if(focused){selected=(String)v.getTag();updateSelection(v);v.post(()->revealFocusedView(v));}
     }
     private boolean focusGeometryReady(View v){return scroll!=null&&v.getWidth()>0&&v.getHeight()>0&&scroll.getHeight()>0&&!v.isLayoutRequested()&&!scroll.isLayoutRequested();}
     private void revealFocusedView(final View v){
@@ -645,13 +665,11 @@ public class MainActivity extends Activity {
         View target=root==null?null:root.findViewWithTag(moving);
         if(target==null){render();return;}
         target.invalidate();target.requestFocus();
-        if(hint!=null)hint.setText(R.string.remote_move_hint);
     }
     private void finishMoving(){
         String previous=moving;moving="";
         View target=root==null?null:root.findViewWithTag(previous);
         if(target!=null)target.invalidate();
-        if(hint!=null)hint.setText(manage?R.string.remote_organize_hint:R.string.remote_navigation_hint);
     }
     void moveApp(Tile tile,int code){
         ArrayList<App> list=manage?groupApps(tile.group,true):homeApps(tile.group);int index=-1;
@@ -724,7 +742,7 @@ public class MainActivity extends Activity {
                 callback.pick(index);
             });
         }
-        TextView back=text(getString(parent==null?R.string.settings_close_hint:R.string.settings_back_hint),12,MUTED);back.setPaddingRelative(dp(16),dp(15),0,0);back.setGravity(Gravity.START);box.addView(back);current.setContentView(box);Window w=current.getWindow();if(w!=null){w.setBackgroundDrawableResource(android.R.color.transparent);w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);WindowManager.LayoutParams lp=w.getAttributes();lp.width=dp(page.isEmpty()?365:420);lp.height=-1;lp.gravity=Gravity.END;lp.dimAmount=.45f;w.setAttributes(lp);w.getDecorView().setSystemUiVisibility(5894);}current.setOnDismissListener(new DialogInterface.OnDismissListener(){public void onDismiss(DialogInterface d){if(sheet==current)sheet=null;}});current.setOnCancelListener(d->{if(parent!=null&&!isFinishing())parent.run();else if(!page.isEmpty())settingsOpen=false;});
+        TextView back=text(getString(parent==null?R.string.settings_close_hint:R.string.settings_back_hint),12,MUTED);back.setPaddingRelative(dp(16),dp(15),0,0);back.setGravity(Gravity.START);box.addView(back);current.setContentView(highResolutionPanel(box));Window w=current.getWindow();if(w!=null){w.setBackgroundDrawableResource(android.R.color.transparent);w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);WindowManager.LayoutParams lp=w.getAttributes();lp.width=dp(page.isEmpty()?365:420);lp.height=-1;lp.gravity=Gravity.END;lp.dimAmount=.45f;w.setAttributes(lp);w.getDecorView().setSystemUiVisibility(5894);}current.setOnDismissListener(new DialogInterface.OnDismissListener(){public void onDismiss(DialogInterface d){if(sheet==current){sheet=null;dialogHighResolution=null;}}});current.setOnCancelListener(d->{if(parent!=null&&!isFinishing())parent.run();else if(!page.isEmpty())settingsOpen=false;});
         if(w!=null&&!page.isEmpty())w.setWindowAnimations(isLowRamDevice()?0:R.style.SettingsFade);
         if(options.getChildCount()>0&&w!=null){final View initial=options.getChildAt(Math.max(0,Math.min(options.getChildCount()-1,savedFocus==null?0:savedFocus)));final View decor=w.getDecorView();final Runnable restore=()->{if(sheet==current&&current.isShowing()&&decor.hasWindowFocus()&&current.getCurrentFocus()==null&&initial.isShown())initial.requestFocus();};decor.getViewTreeObserver().addOnWindowFocusChangeListener(new ViewTreeObserver.OnWindowFocusChangeListener(){public void onWindowFocusChanged(boolean focused){if(focused){restore.run();if(decor.getViewTreeObserver().isAlive())decor.getViewTreeObserver().removeOnWindowFocusChangeListener(this);}}});current.show();initial.requestFocus();decor.postOnAnimation(restore);}else current.show();
     }
@@ -834,6 +852,8 @@ public class MainActivity extends Activity {
                 items.add(new ControlCenter.Item("inputs", getString(R.string.home_show_inputs), null,
                         UiIcon.Glyph.INPUT, prefs.getBoolean("home_show_inputs", true), false,
                         () -> toggleHomeLayout("home_show_inputs", true)));
+                items.add(new ControlCenter.Item("4k",getString(R.string.home_4k),getString(highResolutionAvailable()?R.string.home_4k_detail:R.string.home_4k_unavailable),
+                        UiIcon.Glyph.PICTURE,prefs.getBoolean("home_4k",false),false,this::toggleHighResolution));
                 items.add(new ControlCenter.Item("appearance", getString(R.string.settings_appearance), null,
                         UiIcon.Glyph.PICTURE, null, true, () -> {
                             appearanceFromControl = true;
@@ -915,6 +935,55 @@ public class MainActivity extends Activity {
         refreshHomeLayout();
     }
 
+    private String currentDisplaySignature(){
+        Display display=getWindowManager().getDefaultDisplay();Point size=new Point();display.getRealSize(size);
+        Display.Mode mode=display.getMode();return mode.getPhysicalWidth()+"x"+mode.getPhysicalHeight()+"/"+size.x+"x"+size.y;
+    }
+    private boolean highResolutionAvailable(){
+        if(Build.VERSION.SDK_INT<26||isLowRamDevice())return false;
+        Display.Mode mode=getWindowManager().getDefaultDisplay().getMode();
+        if(mode.getPhysicalWidth()<3840||mode.getPhysicalHeight()<2160)return false;
+        if(highResolutionConfigured)return true;
+        ActivityManager manager=(ActivityManager)getSystemService(ACTIVITY_SERVICE);
+        if(manager==null)return false;
+        ActivityManager.MemoryInfo info=new ActivityManager.MemoryInfo();manager.getMemoryInfo(info);
+        return !info.lowMemory&&info.availMem>=192L*1024*1024;
+    }
+    private void configureHighResolution(View page){
+        boolean enabled=prefs.getBoolean("home_4k",false)&&highResolutionAvailable();
+        Display display=getWindowManager().getDefaultDisplay();Display.Mode mode=display.getMode();Point logical=new Point();display.getRealSize(logical);
+        displaySignature=currentDisplaySignature();highResolutionConfigured=enabled;
+        Point target=HiResSurface.targetSize(mode);
+        wallpapers.highResolutionImages(enabled,target.x,target.y);
+        boolean mirror=enabled&&(logical.x<target.x||logical.y<target.y);
+        if(mirror){if(highResolution==null){highResolution=new HiResSurface(this,(HomeLayer)root,wallpapers,this::disableHighResolution);root.addView(highResolution,new FrameLayout.LayoutParams(-1,-1));}highResolution.updateBufferSize(highResolution.getWidth(),highResolution.getHeight());highResolution.content(page);}
+        else if(highResolution!=null){root.removeView(highResolution);highResolution=null;}
+        if(!mirror&&dialogHighResolution!=null){if(dialogHighResolution.getParent() instanceof ViewGroup)((ViewGroup)dialogHighResolution.getParent()).removeView(dialogHighResolution);dialogHighResolution=null;}
+        else if(dialogHighResolution!=null)dialogHighResolution.updateBufferSize(dialogHighResolution.getWidth(),dialogHighResolution.getHeight());
+        if(controlCenter!=null)controlCenter.highResolution(mirror);
+    }
+    boolean highResolutionSurfaceActive(){return highResolution!=null;}
+    private View highResolutionPanel(View panel){
+        dialogHighResolution=null;
+        if(!highResolutionSurfaceActive())return panel;
+        HomeLayer host=new HomeLayer(this);host.addView(panel,new FrameLayout.LayoutParams(-1,-1));
+        dialogHighResolution=new HiResSurface(this,host,null,this::disableHighResolution);
+        host.addView(dialogHighResolution,new FrameLayout.LayoutParams(-1,-1));dialogHighResolution.content(panel);return host;
+    }
+    private void toggleHighResolution(){
+        boolean on=prefs.getBoolean("home_4k",false);
+        if(!on&&!highResolutionAvailable()){Toast.makeText(this,R.string.home_4k_unavailable,Toast.LENGTH_LONG).show();return;}
+        prefs.edit().putBoolean("home_4k",!on).apply();refreshHomeLayout();
+    }
+    void disableHighResolution(){
+        if(prefs==null||!prefs.getBoolean("home_4k",false))return;
+        prefs.edit().putBoolean("home_4k",false).apply();
+        if(dialogHighResolution!=null){if(dialogHighResolution.getParent() instanceof ViewGroup)((ViewGroup)dialogHighResolution.getParent()).removeView(dialogHighResolution);dialogHighResolution=null;}
+        if(controlCenter!=null)controlCenter.highResolution(false);
+        Toast.makeText(this,R.string.home_4k_fallback,Toast.LENGTH_LONG).show();
+        if(root!=null)refreshHomeLayout();
+    }
+
     private void refreshHomeLayout() {
         render();
         if (controlCenter != null) controlCenter.refresh(ControlCenter.Section.HOME);
@@ -985,7 +1054,7 @@ public class MainActivity extends Activity {
     void launch(Intent i,String name){try{if(i==null)throw new ActivityNotFoundException();startActivity(i);}catch(Exception e){Toast.makeText(this,"暂时无法打开"+name,Toast.LENGTH_LONG).show();}}
     void openPackage(String p){Intent i=getPackageManager().getLeanbackLaunchIntentForPackage(p);if(i==null)i=getPackageManager().getLaunchIntentForPackage(p);if(i==null){Toast.makeText(this,"这个应用尚未安装或没有可用入口",Toast.LENGTH_LONG).show();return;}launch(i,"");}
     void openSettings(){Intent i=SystemEntrypoints.settings(this);if(i!=null)launch(i,"设置");else Toast.makeText(this,"请使用遥控器或原桌面的系统设置入口",Toast.LENGTH_LONG).show();}
-    void showSetup(){final boolean fromSettings=settingsOpen;String status=SystemEntrypoints.defaultHome(this)?"静幕已是默认桌面":"静幕尚未设为默认桌面";settingsPanel("setup",getString(R.string.settings_help),status+"\n\n基础桌面可以直接使用。天气和播放记录默认关闭，可在设置中按需开启。\n\n按 Home 返回桌面、重启后自动进入桌面分别由固件决定。部分 Google TV 的原厂桌面会优先接管 Home 键，可选开启 Home 键修复。原桌面保持可用，可通过系统默认应用设置恢复。",new String[]{getString(R.string.settings_done),getString(R.string.settings_default_home),getString(R.string.settings_home_key),getString(R.string.settings_playback),getString(R.string.settings_other_home),getString(R.string.settings_compatibility)},i->{if(i==0){if(fromSettings)showSystemSettings();else settingsOpen=false;}else if(i==1)chooseDefaultHome();else if(i==2)showHomeKeyFix();else if(i==3)showContentSettings();else if(i==4)openOriginal();else if(i==5)showCompatibility();},fromSettings?this::showSystemSettings:null);}
+    void showSetup(){final boolean fromSettings=settingsOpen;String status=getString(SystemEntrypoints.defaultHome(this)?R.string.setup_home_active:R.string.setup_home_inactive);settingsPanel("setup",getString(R.string.settings_help),status+"\n\n"+getString(R.string.setup_navigation_guide)+"\n\n"+getString(R.string.setup_features)+"\n\n"+getString(R.string.setup_home_behavior),new String[]{getString(R.string.settings_done),getString(R.string.settings_default_home),getString(R.string.settings_home_key),getString(R.string.settings_playback),getString(R.string.settings_other_home),getString(R.string.settings_compatibility)},i->{if(i==0){if(fromSettings)showSystemSettings();else settingsOpen=false;}else if(i==1)chooseDefaultHome();else if(i==2)showHomeKeyFix();else if(i==3)showContentSettings();else if(i==4)openOriginal();else if(i==5)showCompatibility();},fromSettings?this::showSystemSettings:null);}
     void chooseDefaultHome(){Intent i=SystemEntrypoints.homeSettings(this);if(i!=null){launch(i,"默认桌面设置");return;}panel("默认桌面设置","系统未提供通用的默认桌面设置页。可按 Home 查看是否出现桌面选择，选择静幕并设为始终使用；部分厂商需要使用电脑设置。\n\n恢复时在同一入口选择原桌面即可。",new String[]{"打开电视设置","返回"},n->{if(n==0)openSettings();});}
     void showHomeKeyFix(){
         boolean enabled=prefs.getBoolean("home_key_fix",false),service=homeKeyServiceEnabled(),connected=HomeKeyService.connected;long verified=prefs.getLong("home_key_last_return",0),pending=prefs.getLong("home_key_pending",0);String requested=enabled?"Home 键修复 · 已申请":"Home 键修复 · 已关闭";String serviceState=!service?"无障碍服务 · 未启用":connected?"无障碍服务 · 已连接":"无障碍服务 · 等待系统连接";String effect=pending>0&&System.currentTimeMillis()-pending<60000?"等待用户按 Home 验证":verified>0?"最近返回静幕 · "+new SimpleDateFormat("M/d HH:mm",Locale.getDefault()).format(new Date(verified)):"Home 键效果 · 尚未验证";

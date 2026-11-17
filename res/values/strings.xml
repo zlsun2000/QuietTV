@@ -102,6 +102,15 @@
     <string name="remote_navigation_hint">长按确认键 · 整理应用</string>
     <string name="remote_organize_hint">确认键隐藏 / 显示应用    返回键完成整理</string>
     <string name="remote_move_hint">方向键移动卡片    确认键或返回键完成排序</string>
+    <string name="setup_navigation_guide">用方向键选择，确认键打开；长按确认键可整理应用。移动应用时，用方向键调整位置，再按确认键或返回键完成。</string>
+    <string name="setup_home_active">静幕已是默认桌面</string>
+    <string name="setup_home_inactive">静幕尚未设为默认桌面</string>
+    <string name="setup_features">基础桌面可以直接使用。天气和播放记录默认关闭，可在设置中按需开启。</string>
+    <string name="setup_home_behavior">按 Home 返回桌面、重启后自动进入桌面分别由固件决定。部分 Google TV 的原厂桌面会优先接管 Home 键，可选开启 Home 键修复。原桌面保持可用，可通过系统默认应用设置恢复。</string>
+    <string name="home_4k">4K 高清桌面</string>
+    <string name="home_4k_detail">需要 4K 输出，可能增加内存占用</string>
+    <string name="home_4k_unavailable">当前输出或设备内存暂不支持 4K 桌面</string>
+    <string name="home_4k_fallback">4K 桌面暂不可用，已恢复标准画面</string>
     <string name="loading_desktop">正在准备桌面…</string>
     <string name="empty_favorites_hint">长按应用卡片，添加到常用</string>
     <string name="empty_group_hint">在应用菜单中添加到此分类</string>

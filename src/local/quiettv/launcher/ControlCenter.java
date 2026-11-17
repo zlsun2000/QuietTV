@@ -13,6 +13,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ImageView;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -94,6 +95,8 @@ final class ControlCenter extends Dialog {
     private static final Section[] SECTIONS = Section.values();
     private final MainActivity host;
     private final LinearLayout surface, rows;
+    private final HomeLayer resolutionHost;
+    private HiResSurface highResolution;
     private final ScrollView detailScroll;
     private final TextView time, date, heading, status, help, footerStatus;
     private final String version;
@@ -205,7 +208,10 @@ final class ControlCenter extends Dialog {
         footerParams.topMargin = host.dp(13);
         surface.addView(footer, footerParams);
 
-        setContentView(surface);
+        resolutionHost = new HomeLayer(host);
+        resolutionHost.addView(surface, new FrameLayout.LayoutParams(-1,-1));
+        setContentView(resolutionHost);
+        highResolution(host.highResolutionSurfaceActive());
         Window window = getWindow();
         if (window != null) {
             window.setBackgroundDrawableResource(android.R.color.transparent);
@@ -217,6 +223,19 @@ final class ControlCenter extends Dialog {
             params.dimAmount = .40f;
             window.setAttributes(params);
             window.getDecorView().setSystemUiVisibility(5894);
+        }
+    }
+
+    void highResolution(boolean enabled) {
+        if (enabled && highResolution == null) {
+            highResolution = new HiResSurface(host,resolutionHost,null,host::disableHighResolution);
+            resolutionHost.addView(highResolution,new FrameLayout.LayoutParams(-1,-1));
+            highResolution.content(surface);
+        } else if (!enabled && highResolution != null) {
+            resolutionHost.removeView(highResolution);
+            highResolution = null;
+        } else if (enabled && highResolution != null) {
+            highResolution.updateBufferSize(highResolution.getWidth(),highResolution.getHeight());
         }
     }
 
