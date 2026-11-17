@@ -16,11 +16,13 @@ The app's menus currently use Chinese. This guide keeps the actual menu labels a
 
 App organization, the clock, and imported backgrounds work offline. Weather and playback history are disabled on fresh installations; enable them only if you want them.
 
+In **控制中心 → 主页布局** (Control center → Home layout), the optional **4K 高清桌面** (4K desktop) is off by default. If the picture becomes slow or returns to standard rendering, you can keep using the standard setting.
+
 **Successful installation, Home-button behavior, and starting at boot must be checked separately.** Some TVs still open the stock launcher at boot. Keep it installed and enabled so you can switch back.
 
 ## Upgrading
 
-- **Official 0.13.0–1.0.0 to 1.0.1** can be updated by installing the new APK over the existing app. Favorites, backgrounds, settings, and history are retained.
+- **Official 0.13.0–1.0.1 to 1.0.2** can be updated by installing the new APK over the existing app. Favorites, backgrounds, settings, and history are retained.
 - **0.12.0 or earlier:** the signing identity changed, so these installations cannot be updated directly with the newer official APK. Reinstallation requires uninstalling the old app, which **deletes its settings, favorites, backgrounds, and playback history**. Decide whether that data loss is acceptable before proceeding.
 - **Custom builds or APKs from other sources:** they may use a different signature. Check the source and error before uninstalling an app that contains data you need.
 

@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.quiettv.renderprobe" android:versionCode="1" android:versionName="0.1">
+    <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <application android:label="QuietTV isolated 4K probe" android:debuggable="true" android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity android:name=".ProbeActivity" android:exported="true" android:screenOrientation="landscape" />
+    </application>
+</manifest>
